@@ -494,8 +494,6 @@
             const contribution = parseInt(document.getElementById('contribution').value);
             const actualContribution = gameState.selectedChoice === 'red' ? 0 : contribution;
             
-            updateDebug(`Submitting: negotiated=${contribution}, actual=${actualContribution}, choice=${gameState.selectedChoice}`);
-            
             try {
                 // Submit this team's data to Firebase
                 const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
@@ -508,17 +506,12 @@
                     timestamp: Date.now()
                 });
                 
-                updateDebug(`✓ Submitted as ${myTeamKey} to Firebase`);
-                
                 // Hide controls and show waiting
                 document.getElementById('game-controls').classList.add('hidden');
                 document.getElementById('waiting-for-round').classList.remove('hidden');
                 
-                updateDebug('UI updated - now waiting for opponent or results');
-                
             } catch (error) {
                 console.error('Error submitting round:', error);
-                updateDebug('Submit error: ' + error.message);
                 showError('Error submitting. Please try again.');
             }
         }
