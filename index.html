@@ -430,15 +430,34 @@
             for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
                 const option = document.createElement('option');
                 option.value = i;
-                option.textContent = `$${i}`;
+                option.textContent = `${i}`;
                 contributionSelect.appendChild(option);
             }
             
-            // Check game state
+            // Check if both teams are present
             if (tableData.teamA && tableData.teamB) {
                 document.getElementById('waiting-for-opponent').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                updateDebug('Both teams present - game ready');
+                
+                // Check if round is in progress
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+                
+                if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
+                    // I've submitted, waiting for opponent
+                    document.getElementById('game-controls').classList.add('hidden');
+                    document.getElementById('waiting-for-round').classList.remove('hidden');
+                    updateDebug('Waiting for opponent to submit');
+                } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey]) {
+                    // Both submitted, show results
+                    updateDebug('Both teams submitted - calculating results');
+                    calculateResults(tableData);
+                } else {
+                    // Ready to play
+                    document.getElementById('game-controls').classList.remove('hidden');
+                    document.getElementById('waiting-for-round').classList.add('hidden');
+                    document.getElementById('round-results').classList.add('hidden');
+                    updateDebug('Ready to play');
+                }
             } else {
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
@@ -464,17 +483,133 @@
             document.getElementById('submit-button').disabled = false;
         }
 
-        function testSubmitRound() {
+        async function testSubmitRound() {
             updateDebug('Submit round clicked');
+            
             if (!gameState.selectedChoice) {
                 showError('Please select Black or Red');
                 return;
             }
-            // For now, just show a message
-            showError(`Submitted: ${gameState.selectedChoice}`);
+            
+            const contribution = parseInt(document.getElementById('contribution').value);
+            const actualContribution = gameState.selectedChoice === 'red' ? 0 : contribution;
+            
+            updateDebug(`Submitting: negotiated=${contribution}, actual=${actualContribution}, choice=${gameState.selectedChoice}`);
+            
+            try {
+                // Submit this team's data to Firebase
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                const roundDataRef = database.ref(`tables/${gameState.tableCode}/roundData/${myTeamKey}`);
+                
+                await roundDataRef.set({
+                    negotiated: contribution,
+                    actual: actualContribution,
+                    choice: gameState.selectedChoice,
+                    timestamp: Date.now()
+                });
+                
+                updateDebug('Round data submitted to Firebase');
+                
+                // Hide controls and show waiting
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error submitting round:', error);
+                updateDebug('Submit error: ' + error.message);
+                showError('Error submitting. Please try again.');
+            }
         }
 
-        function testNewRound() {
+        async function calculateResults(tableData) {
+            const dataA = tableData.roundData.teamA;
+            const dataB = tableData.roundData.teamB;
+            
+            if (!dataA || !dataB) return; // Not ready yet
+            
+            updateDebug(`Calculating: A contributed ${dataA.actual}, B contributed ${dataB.actual}`);
+            
+            // Calculate public good returns
+            const totalContribution = dataA.actual + dataB.actual;
+            const publicGoodReturn = (totalContribution * 1.5) / 2;
+            
+            // Calculate new budgets
+            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+            
+            updateDebug(`New budgets: A=${Math.round(newBudgetA)}, B=${Math.round(newBudgetB)}`);
+            
+            try {
+                // Update budgets in Firebase
+                const updates = {};
+                updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
+                updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                
+                // Update team records
+                updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+                updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+                
+                // Get current round counts and increment
+                const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
+                const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
+                
+                updates[`teams/${tableData.teamA.name}/totalRounds`] = (teamASnapshot.val() || 0) + 1;
+                updates[`teams/${tableData.teamB.name}/totalRounds`] = (teamBSnapshot.val() || 0) + 1;
+                
+                await database.ref().update(updates);
+                
+                // Update local budget
+                gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
+                updateDebug(`Updated local budget to: ${gameState.budget}`);
+                
+                // Display results
+                showResults(dataA, dataB, publicGoodReturn, tableData);
+                
+            } catch (error) {
+                console.error('Error updating results:', error);
+                updateDebug('Calculate error: ' + error.message);
+                showError('Error calculating results. Please refresh.');
+            }
+        }
+
+        function showResults(dataA, dataB, publicGoodReturn, tableData) {
+            const myData = gameState.isTeamA ? dataA : dataB;
+            const opponentData = gameState.isTeamA ? dataB : dataA;
+            const opponentName = gameState.isTeamA ? tableData.teamB.name : tableData.teamA.name;
+            
+            const resultsHTML = `
+                <div class="result-line">
+                    <span>Your negotiated:</span>
+                    <span>${myData.negotiated}</span>
+                </div>
+                <div class="result-line">
+                    <span>Your actual:</span>
+                    <span>${myData.actual} (${myData.choice.toUpperCase()})</span>
+                </div>
+                <div class="result-line">
+                    <span>${opponentName} negotiated:</span>
+                    <span>${opponentData.negotiated}</span>
+                </div>
+                <div class="result-line">
+                    <span>${opponentName} actual:</span>
+                    <span>${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
+                </div>
+                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
+                    <span>Public good return:</span>
+                    <span>${Math.round(publicGoodReturn)}</span>
+                </div>
+                <div class="result-line">
+                    <span><strong>Your new budget:</strong></span>
+                    <span><strong>${gameState.budget}</strong></span>
+                </div>
+            `;
+            
+            document.getElementById('results-content').innerHTML = resultsHTML;
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('round-results').classList.remove('hidden');
+            
+            updateDebug('Results displayed');
+        }
             updateDebug('New round clicked');
             // Reset UI
             document.getElementById('round-results').classList.add('hidden');
