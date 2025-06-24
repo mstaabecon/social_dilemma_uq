@@ -435,8 +435,8 @@
                     // Both submitted, show results (with loop protection)
                     isCalculating = true;
                     calculateResults(tableData);
-                } else {
-                    // Ready to play
+                } else if (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey])) {
+                    // Ready to play (only if no round data exists)
                     document.getElementById('game-controls').classList.remove('hidden');
                     document.getElementById('waiting-for-round').classList.add('hidden');
                     document.getElementById('round-results').classList.add('hidden');
@@ -586,6 +586,9 @@
             try {
                 // Clear round data for this table but keep teams
                 await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
+                
+                // Reset calculation flag for new round
+                isCalculating = false;
                 
                 // Reset UI for new round at same table
                 document.getElementById('round-results').classList.add('hidden');
