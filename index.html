@@ -253,7 +253,8 @@
                     <div id="results-content"></div>
                 </div>
                 
-                <button class="button button-secondary" onclick="newRound()">Next Round / Change Table</button>
+                <button class="button button-secondary" onclick="nextRound()">Next Round (Same Table)</button>
+                <button class="button button-secondary" onclick="changeTable()">Change Table</button>
             </div>
         </div>
         
@@ -290,6 +291,7 @@
         };
 
         let currentTableRef = null;
+        let isCalculating = false; // Prevent infinite loops
         let isCalculating = false; // Prevent infinite loops
 
         async function joinTable() {
@@ -544,12 +546,37 @@
             document.getElementById('round-results').classList.remove('hidden');
         }
 
-        async function newRound() {
+        async function nextRound() {
             try {
+                // Clear round data for this table but keep teams
+                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
+                
+                // Reset UI for new round at same table
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('game-controls').classList.remove('hidden');
+                
+                gameState.selectedChoice = null;
+                document.querySelectorAll('.choice-button').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                document.getElementById('submit-button').disabled = true;
+                
+            } catch (error) {
+                console.error('Error starting new round:', error);
+                showError('Error preparing new round. Please refresh if needed.');
+            }
+        }
+
+        async function changeTable() {
+            try {
+                // Remove this team from current table
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                await database.ref(`tables/${gameState.tableCode}/${myTeamKey}`).remove();
+                
                 // Clear round data for this table
                 await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
                 
-                // Reset UI
+                // Reset UI for table selection
                 document.getElementById('round-results').classList.add('hidden');
                 document.getElementById('game-phase').classList.add('hidden');
                 document.getElementById('setup-phase').classList.remove('hidden');
@@ -568,8 +595,8 @@
                 }
                 
             } catch (error) {
-                console.error('Error starting new round:', error);
-                showError('Error preparing new round. Please refresh if needed.');
+                console.error('Error changing table:', error);
+                showError('Error changing table. Please refresh if needed.');
             }
         }
 
