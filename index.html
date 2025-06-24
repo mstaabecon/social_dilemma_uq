@@ -184,24 +184,11 @@
             margin-bottom: 20px;
             text-align: center;
         }
-
-        .debug {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-size: 12px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🤝 The Social Dilemma</h1>
-        
-        <!-- Debug info -->
-        <div id="debug-info" class="debug">
-            Loading Firebase...
-        </div>
         
         <!-- Setup Phase -->
         <div id="setup-phase">
@@ -215,7 +202,7 @@
                 <input type="text" id="table-code" placeholder="Enter table code (e.g. T1)">
             </div>
             
-            <button class="button button-primary" onclick="testJoinTable()" id="join-button">Join Table</button>
+            <button class="button button-primary" onclick="joinTable()">Join Table</button>
         </div>
         
         <!-- Game Phase -->
@@ -243,15 +230,15 @@
                 
                 <label>Secret Choice</label>
                 <div class="choice-buttons">
-                    <button class="choice-button choice-black" onclick="testSelectChoice('black')">
+                    <button class="choice-button choice-black" onclick="selectChoice('black')">
                         ⚫ BLACK<br><small>Honor agreement</small>
                     </button>
-                    <button class="choice-button choice-red" onclick="testSelectChoice('red')">
+                    <button class="choice-button choice-red" onclick="selectChoice('red')">
                         🔴 RED<br><small>Contribute $0</small>
                     </button>
                 </div>
                 
-                <button class="button button-primary" onclick="testSubmitRound()" id="submit-button" disabled>
+                <button class="button button-primary" onclick="submitRound()" id="submit-button" disabled>
                     Submit Round
                 </button>
             </div>
@@ -266,7 +253,7 @@
                     <div id="results-content"></div>
                 </div>
                 
-                <button class="button button-secondary" onclick="testNewRound()">Next Round / Change Table</button>
+                <button class="button button-secondary" onclick="newRound()">Next Round / Change Table</button>
             </div>
         </div>
         
@@ -278,11 +265,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
-        // Debug function
-        function updateDebug(message) {
-            document.getElementById('debug-info').textContent = message;
-        }
-
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
@@ -295,15 +277,8 @@
         };
 
         // Initialize Firebase
-        let app, database;
-        try {
-            app = firebase.initializeApp(firebaseConfig);
-            database = firebase.database();
-            updateDebug('Firebase connected successfully!');
-        } catch (error) {
-            updateDebug('Firebase error: ' + error.message);
-            console.error('Firebase initialization error:', error);
-        }
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         // Game state
         let gameState = {
@@ -315,30 +290,16 @@
         };
 
         let currentTableRef = null;
+        let isCalculating = false; // Prevent infinite loops
 
-        function testJoinTable() {
-            updateDebug('Join button clicked!');
-            
+        async function joinTable() {
             const teamName = document.getElementById('team-name').value.trim();
             const tableCode = document.getElementById('table-code').value.trim().toUpperCase();
-            
-            updateDebug(`Team: ${teamName}, Table: ${tableCode}`);
             
             if (!teamName || !tableCode) {
                 showError('Please enter both team name and table code');
                 return;
             }
-
-            if (!database) {
-                showError('Firebase not connected. Please refresh the page.');
-                return;
-            }
-
-            joinTable(teamName, tableCode);
-        }
-
-        async function joinTable(teamName, tableCode) {
-            updateDebug('Joining table...');
             
             gameState.teamName = teamName;
             gameState.tableCode = tableCode;
@@ -356,8 +317,6 @@
                     status: 'waiting'
                 };
                 
-                updateDebug('Table data retrieved');
-
                 // Get team's existing budget
                 const teamRef = database.ref(`teams/${teamName}`);
                 const teamSnapshot = await teamRef.once('value');
@@ -365,31 +324,25 @@
                 
                 if (teamData) {
                     gameState.budget = teamData.budget;
-                    updateDebug(`Found existing team with budget: ${gameState.budget}`);
                 } else {
                     // New team
                     await teamRef.set({ budget: 500, totalRounds: 0 });
                     gameState.budget = 500;
-                    updateDebug('Created new team');
                 }
                 
                 // Join table logic
                 if (!tableData.teamA) {
                     tableData.teamA = { name: teamName, budget: gameState.budget };
                     gameState.isTeamA = true;
-                    updateDebug('Joined as Team A');
                 } else if (!tableData.teamB && tableData.teamA.name !== teamName) {
                     tableData.teamB = { name: teamName, budget: gameState.budget };
                     gameState.isTeamA = false;
-                    updateDebug('Joined as Team B');
                 } else if (tableData.teamA.name === teamName) {
                     tableData.teamA.budget = gameState.budget;
                     gameState.isTeamA = true;
-                    updateDebug('Rejoined as Team A');
                 } else if (tableData.teamB && tableData.teamB.name === teamName) {
                     tableData.teamB.budget = gameState.budget;
                     gameState.isTeamA = false;
-                    updateDebug('Rejoined as Team B');
                 } else {
                     showError('Table is full with different teams');
                     return;
@@ -397,7 +350,6 @@
                 
                 // Update table in Firebase
                 await currentTableRef.set(tableData);
-                updateDebug('Table updated in Firebase');
                 
                 // Set up real-time listener
                 currentTableRef.on('value', (snapshot) => {
@@ -410,18 +362,14 @@
                 // Switch to game phase
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
-                updateDebug('Switched to game phase');
                 
             } catch (error) {
                 console.error('Error joining table:', error);
-                updateDebug('Error: ' + error.message);
-                showError('Error joining table: ' + error.message);
+                showError('Error joining table. Please try again.');
             }
         }
 
         function updateGameState(tableData) {
-            updateDebug(`Game state update: A=${tableData.teamA?.name || 'none'}, B=${tableData.teamB?.name || 'none'}`);
-            
             document.getElementById('current-budget').textContent = gameState.budget;
             
             // Update contribution options
@@ -430,7 +378,7 @@
             for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
                 const option = document.createElement('option');
                 option.value = i;
-                option.textContent = `${i}`;
+                option.textContent = `$${i}`;
                 contributionSelect.appendChild(option);
             }
             
@@ -446,27 +394,23 @@
                     // I've submitted, waiting for opponent
                     document.getElementById('game-controls').classList.add('hidden');
                     document.getElementById('waiting-for-round').classList.remove('hidden');
-                    updateDebug('Waiting for opponent to submit');
-                } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey]) {
-                    // Both submitted, show results
-                    updateDebug('Both teams submitted - calculating results');
+                } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
+                    // Both submitted, show results (with loop protection)
+                    isCalculating = true;
                     calculateResults(tableData);
                 } else {
                     // Ready to play
                     document.getElementById('game-controls').classList.remove('hidden');
                     document.getElementById('waiting-for-round').classList.add('hidden');
                     document.getElementById('round-results').classList.add('hidden');
-                    updateDebug('Ready to play');
                 }
             } else {
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
-                updateDebug('Waiting for second team');
             }
         }
 
-        function testSelectChoice(choice) {
-            updateDebug(`Selected: ${choice}`);
+        function selectChoice(choice) {
             gameState.selectedChoice = choice;
             
             // Update button states
@@ -483,9 +427,7 @@
             document.getElementById('submit-button').disabled = false;
         }
 
-        async function testSubmitRound() {
-            updateDebug('Submit round clicked');
-            
+        async function submitRound() {
             if (!gameState.selectedChoice) {
                 showError('Please select Black or Red');
                 return;
@@ -493,8 +435,6 @@
             
             const contribution = parseInt(document.getElementById('contribution').value);
             const actualContribution = gameState.selectedChoice === 'red' ? 0 : contribution;
-            
-            updateDebug(`Submitting: negotiated=${contribution}, actual=${actualContribution}, choice=${gameState.selectedChoice}`);
             
             try {
                 // Submit this team's data to Firebase
@@ -508,15 +448,12 @@
                     timestamp: Date.now()
                 });
                 
-                updateDebug('Round data submitted to Firebase');
-                
                 // Hide controls and show waiting
                 document.getElementById('game-controls').classList.add('hidden');
                 document.getElementById('waiting-for-round').classList.remove('hidden');
                 
             } catch (error) {
                 console.error('Error submitting round:', error);
-                updateDebug('Submit error: ' + error.message);
                 showError('Error submitting. Please try again.');
             }
         }
@@ -525,9 +462,7 @@
             const dataA = tableData.roundData.teamA;
             const dataB = tableData.roundData.teamB;
             
-            if (!dataA || !dataB) return; // Not ready yet
-            
-            updateDebug(`Calculating: A contributed ${dataA.actual}, B contributed ${dataB.actual}`);
+            if (!dataA || !dataB) return;
             
             // Calculate public good returns
             const totalContribution = dataA.actual + dataB.actual;
@@ -536,8 +471,6 @@
             // Calculate new budgets
             const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
             const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
-            
-            updateDebug(`New budgets: A=${Math.round(newBudgetA)}, B=${Math.round(newBudgetB)}`);
             
             try {
                 // Update budgets in Firebase
@@ -560,15 +493,17 @@
                 
                 // Update local budget
                 gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
-                updateDebug(`Updated local budget to: ${gameState.budget}`);
                 
                 // Display results
                 showResults(dataA, dataB, publicGoodReturn, tableData);
                 
+                // Reset calculation flag
+                isCalculating = false;
+                
             } catch (error) {
                 console.error('Error updating results:', error);
-                updateDebug('Calculate error: ' + error.message);
                 showError('Error calculating results. Please refresh.');
+                isCalculating = false; // Reset flag on error too
             }
         }
 
@@ -580,48 +515,62 @@
             const resultsHTML = `
                 <div class="result-line">
                     <span>Your negotiated:</span>
-                    <span>${myData.negotiated}</span>
+                    <span>$${myData.negotiated}</span>
                 </div>
                 <div class="result-line">
                     <span>Your actual:</span>
-                    <span>${myData.actual} (${myData.choice.toUpperCase()})</span>
+                    <span>$${myData.actual} (${myData.choice.toUpperCase()})</span>
                 </div>
                 <div class="result-line">
                     <span>${opponentName} negotiated:</span>
-                    <span>${opponentData.negotiated}</span>
+                    <span>$${opponentData.negotiated}</span>
                 </div>
                 <div class="result-line">
                     <span>${opponentName} actual:</span>
-                    <span>${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
+                    <span>$${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
                 </div>
                 <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
                     <span>Public good return:</span>
-                    <span>${Math.round(publicGoodReturn)}</span>
+                    <span>$${Math.round(publicGoodReturn)}</span>
                 </div>
                 <div class="result-line">
                     <span><strong>Your new budget:</strong></span>
-                    <span><strong>${gameState.budget}</strong></span>
+                    <span><strong>$${gameState.budget}</strong></span>
                 </div>
             `;
             
             document.getElementById('results-content').innerHTML = resultsHTML;
             document.getElementById('waiting-for-round').classList.add('hidden');
             document.getElementById('round-results').classList.remove('hidden');
-            
-            updateDebug('Results displayed');
         }
-            updateDebug('New round clicked');
-            // Reset UI
-            document.getElementById('round-results').classList.add('hidden');
-            document.getElementById('game-phase').classList.add('hidden');
-            document.getElementById('setup-phase').classList.remove('hidden');
-            
-            gameState.selectedChoice = null;
-            document.getElementById('table-code').value = '';
-            document.querySelectorAll('.choice-button').forEach(btn => {
-                btn.classList.remove('selected');
-            });
-            document.getElementById('submit-button').disabled = true;
+
+        async function newRound() {
+            try {
+                // Clear round data for this table
+                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
+                
+                // Reset UI
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('game-phase').classList.add('hidden');
+                document.getElementById('setup-phase').classList.remove('hidden');
+                
+                gameState.selectedChoice = null;
+                document.getElementById('table-code').value = '';
+                document.querySelectorAll('.choice-button').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                document.getElementById('submit-button').disabled = true;
+                
+                // Stop listening to current table
+                if (currentTableRef) {
+                    currentTableRef.off();
+                    currentTableRef = null;
+                }
+                
+            } catch (error) {
+                console.error('Error starting new round:', error);
+                showError('Error preparing new round. Please refresh if needed.');
+            }
         }
 
         function showError(message) {
@@ -632,15 +581,6 @@
                 errorDiv.classList.add('hidden');
             }, 3000);
         }
-
-        // Test Firebase connection on load
-        window.addEventListener('load', function() {
-            if (database) {
-                updateDebug('Ready to play! Firebase connected.');
-            } else {
-                updateDebug('Error: Firebase not connected');
-            }
-        });
     </script>
 </body>
 </html>
