@@ -256,21 +256,39 @@
         <div id="error-message" class="error hidden"></div>
     </div>
 
-    <script>
+    <!-- Firebase -->
+    <script type="module">
+        // Import Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, push, update } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+        
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
+            authDomain: "social-dilemma-game.firebaseapp.com",
+            databaseURL: "https://social-dilemma-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "social-dilemma-game",
+            storageBucket: "social-dilemma-game.firebasestorage.app",
+            messagingSenderId: "579478025877",
+            appId: "1:579478025877:web:71e8a165988c8d73408d9c"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        
         // Game state
         let gameState = {
             teamName: '',
             tableCode: '',
             budget: 500,
             selectedChoice: null,
-            gameData: {}
+            isTeamA: false
         };
+        
+        let currentTableRef = null;
 
-        // In-memory storage for demo
-        let gameDatabase = {};
-        let leaderboard = {};
-
-        function joinTable() {
+        async function joinTable() {
             const teamName = document.getElementById('team-name').value.trim();
             const tableCode = document.getElementById('table-code').value.trim().toUpperCase();
             
@@ -282,47 +300,77 @@
             gameState.teamName = teamName;
             gameState.tableCode = tableCode;
             
-            // Initialize leaderboard entry
-            if (!leaderboard[teamName]) {
-                leaderboard[teamName] = { budget: 500, totalRounds: 0 };
-            } else {
-                gameState.budget = leaderboard[teamName].budget;
-            }
-            
-            // Initialize table
-            if (!gameDatabase[tableCode]) {
-                gameDatabase[tableCode] = {
+            try {
+                // Reference to this table
+                currentTableRef = ref(database, `tables/${tableCode}`);
+                
+                // Get existing table data
+                const tableSnapshot = await get(currentTableRef);
+                let tableData = tableSnapshot.val() || {
                     teamA: null,
                     teamB: null,
                     roundData: {},
                     status: 'waiting'
                 };
+                
+                // Get team's existing budget from teams collection
+                const teamRef = ref(database, `teams/${teamName}`);
+                const teamSnapshot = await get(teamRef);
+                const teamData = teamSnapshot.val();
+                
+                if (teamData) {
+                    gameState.budget = teamData.budget;
+                } else {
+                    // New team, set initial budget
+                    await set(teamRef, { budget: 500, totalRounds: 0 });
+                    gameState.budget = 500;
+                }
+                
+                // Join table logic
+                if (!tableData.teamA) {
+                    // First team joins as Team A
+                    tableData.teamA = { name: teamName, budget: gameState.budget };
+                    gameState.isTeamA = true;
+                } else if (!tableData.teamB && tableData.teamA.name !== teamName) {
+                    // Second team joins as Team B
+                    tableData.teamB = { name: teamName, budget: gameState.budget };
+                    gameState.isTeamA = false;
+                } else if (tableData.teamA.name === teamName) {
+                    // Existing Team A rejoining
+                    tableData.teamA.budget = gameState.budget;
+                    gameState.isTeamA = true;
+                } else if (tableData.teamB && tableData.teamB.name === teamName) {
+                    // Existing Team B rejoining
+                    tableData.teamB.budget = gameState.budget;
+                    gameState.isTeamA = false;
+                } else {
+                    showError('Table is full with different teams');
+                    return;
+                }
+                
+                // Update table in Firebase
+                await set(currentTableRef, tableData);
+                
+                // Set up real-time listener
+                onValue(currentTableRef, (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        updateGameState(data);
+                    }
+                });
+                
+                // Switch to game phase
+                document.getElementById('setup-phase').classList.add('hidden');
+                document.getElementById('game-phase').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error joining table:', error);
+                showError('Error joining table. Please try again.');
             }
-            
-            // Join table
-            const table = gameDatabase[tableCode];
-            if (!table.teamA) {
-                table.teamA = { name: teamName, budget: gameState.budget };
-            } else if (!table.teamB && table.teamA.name !== teamName) {
-                table.teamB = { name: teamName, budget: gameState.budget };
-            } else if (table.teamA.name === teamName) {
-                table.teamA.budget = gameState.budget;
-            } else if (table.teamB && table.teamB.name === teamName) {
-                table.teamB.budget = gameState.budget;
-            } else {
-                showError('Table is full or you are already in this table');
-                return;
-            }
-            
-            document.getElementById('setup-phase').classList.add('hidden');
-            document.getElementById('game-phase').classList.remove('hidden');
-            
-            updateGameState();
         }
 
-        function updateGameState() {
-            const table = gameDatabase[gameState.tableCode];
-            if (!table) return;
+        function updateGameState(tableData) {
+            if (!tableData) return;
             
             document.getElementById('current-budget').textContent = gameState.budget;
             
@@ -332,13 +380,31 @@
             for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
                 const option = document.createElement('option');
                 option.value = i;
-                option.textContent = `$${i}`;
+                option.textContent = `${i}`;
                 contributionSelect.appendChild(option);
             }
             
-            if (table.teamA && table.teamB) {
+            // Check if both teams are present
+            if (tableData.teamA && tableData.teamB) {
                 document.getElementById('waiting-for-opponent').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
+                
+                // Check if round is in progress
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+                
+                if (tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
+                    // I've submitted, waiting for opponent
+                    document.getElementById('game-controls').classList.add('hidden');
+                    document.getElementById('waiting-for-round').classList.remove('hidden');
+                } else if (tableData.roundData[myTeamKey] && tableData.roundData[opponentKey]) {
+                    // Both submitted, show results
+                    calculateResults(tableData);
+                } else {
+                    // Ready to play
+                    document.getElementById('game-controls').classList.remove('hidden');
+                    document.getElementById('waiting-for-round').classList.add('hidden');
+                    document.getElementById('round-results').classList.add('hidden');
+                }
             } else {
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
@@ -428,75 +494,75 @@
             }
         }
 
-        function calculateResults() {
-            const table = gameDatabase[gameState.tableCode];
-            const dataA = table.roundData.teamA;
-            const dataB = table.roundData.teamB;
+        async function calculateResults(tableData) {
+            const dataA = tableData.roundData.teamA;
+            const dataB = tableData.roundData.teamB;
+            
+            if (!dataA || !dataB) return; // Not ready yet
             
             // Calculate public good returns
             const totalContribution = dataA.actual + dataB.actual;
             const publicGoodReturn = (totalContribution * 1.5) / 2;
             
             // Calculate new budgets
-            const newBudgetA = (table.teamA.budget - dataA.actual) + publicGoodReturn;
-            const newBudgetB = (table.teamB.budget - dataB.actual) + publicGoodReturn;
+            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
             
-            // Update budgets
-            table.teamA.budget = Math.round(newBudgetA);
-            table.teamB.budget = Math.round(newBudgetB);
+            // Update budgets in Firebase
+            const updates = {};
+            updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
+            updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
             
-            // Update game state budget
-            if (table.teamA.name === gameState.teamName) {
-                gameState.budget = table.teamA.budget;
-            } else {
-                gameState.budget = table.teamB.budget;
+            // Update team records
+            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+            updates[`teams/${tableData.teamA.name}/totalRounds`] = (await get(ref(database, `teams/${tableData.teamA.name}/totalRounds`))).val() + 1 || 1;
+            updates[`teams/${tableData.teamB.name}/totalRounds`] = (await get(ref(database, `teams/${tableData.teamB.name}/totalRounds`))).val() + 1 || 1;
+            
+            try {
+                await update(ref(database), updates);
+                
+                // Update local budget
+                gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
+                
+                // Display results
+                showResults(dataA, dataB, publicGoodReturn, tableData);
+                
+            } catch (error) {
+                console.error('Error updating results:', error);
+                showError('Error calculating results. Please refresh.');
             }
-            
-            // Update leaderboard
-            leaderboard[table.teamA.name] = { 
-                budget: table.teamA.budget, 
-                totalRounds: (leaderboard[table.teamA.name]?.totalRounds || 0) + 1 
-            };
-            leaderboard[table.teamB.name] = { 
-                budget: table.teamB.budget, 
-                totalRounds: (leaderboard[table.teamB.name]?.totalRounds || 0) + 1 
-            };
-            
-            // Display results
-            showResults(dataA, dataB, publicGoodReturn);
         }
 
-        function showResults(dataA, dataB, publicGoodReturn) {
-            const table = gameDatabase[gameState.tableCode];
-            const isTeamA = table.teamA.name === gameState.teamName;
-            const myData = isTeamA ? dataA : dataB;
-            const opponentData = isTeamA ? dataB : dataA;
-            const opponentName = isTeamA ? table.teamB.name : table.teamA.name;
+        function showResults(dataA, dataB, publicGoodReturn, tableData) {
+            const myData = gameState.isTeamA ? dataA : dataB;
+            const opponentData = gameState.isTeamA ? dataB : dataA;
+            const opponentName = gameState.isTeamA ? tableData.teamB.name : tableData.teamA.name;
             
             const resultsHTML = `
                 <div class="result-line">
                     <span>Your negotiated:</span>
-                    <span>$${myData.negotiated}</span>
+                    <span>${myData.negotiated}</span>
                 </div>
                 <div class="result-line">
                     <span>Your actual:</span>
-                    <span>$${myData.actual} (${myData.choice.toUpperCase()})</span>
+                    <span>${myData.actual} (${myData.choice.toUpperCase()})</span>
                 </div>
                 <div class="result-line">
                     <span>${opponentName} negotiated:</span>
-                    <span>$${opponentData.negotiated}</span>
+                    <span>${opponentData.negotiated}</span>
                 </div>
                 <div class="result-line">
                     <span>${opponentName} actual:</span>
-                    <span>$${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
+                    <span>${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
                 </div>
                 <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
                     <span>Public good return:</span>
-                    <span>$${Math.round(publicGoodReturn)}</span>
+                    <span>${Math.round(publicGoodReturn)}</span>
                 </div>
                 <div class="result-line">
                     <span><strong>Your new budget:</strong></span>
-                    <span><strong>$${gameState.budget}</strong></span>
+                    <span><strong>${gameState.budget}</strong></span>
                 </div>
             `;
             
