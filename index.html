@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Social Dilemma</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #51247A 0%, #663399 50%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 16px;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        }
+        
+        .button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .button-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        .button-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .choice-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .choice-button {
+            flex: 1;
+            padding: 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .choice-black {
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .choice-red {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .choice-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .choice-button.selected {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .budget-display {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+        }
+        
+        .results {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .results h3 {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .result-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤝 The Social Dilemma</h1>
+        
+        <!-- Setup Phase -->
+        <div id="setup-phase">
+            <div class="form-group">
+                <label for="team-name">Team Name</label>
+                <input type="text" id="team-name" placeholder="Enter your team name">
+            </div>
+            
+            <div class="form-group">
+                <label for="table-code">Table Code</label>
+                <input type="text" id="table-code" placeholder="Enter table code (e.g. T1)">
+            </div>
+            
+            <button class="button button-primary" onclick="joinTable()">Join Table</button>
+        </div>
+        
+        <!-- Game Phase -->
+        <div id="game-phase" class="hidden">
+            <div class="budget-display">
+                Budget: $<span id="current-budget">500</span>
+            </div>
+            
+            <div id="waiting-for-opponent" class="status hidden">
+                Waiting for opponent team to join...
+            </div>
+            
+            <div id="game-controls" class="hidden">
+                <div class="form-group">
+                    <label for="contribution">Negotiated Contribution (multiples of 100)</label>
+                    <select id="contribution">
+                        <option value="0">$0</option>
+                        <option value="100">$100</option>
+                        <option value="200">$200</option>
+                        <option value="300">$300</option>
+                        <option value="400">$400</option>
+                        <option value="500">$500</option>
+                    </select>
+                </div>
+                
+                <label>Secret Choice</label>
+                <div class="choice-buttons">
+                    <button class="choice-button choice-black" onclick="selectChoice('black')">
+                        ⚫ BLACK<br><small>Honor agreement</small>
+                    </button>
+                    <button class="choice-button choice-red" onclick="selectChoice('red')">
+                        🔴 RED<br><small>Contribute $0</small>
+                    </button>
+                </div>
+                
+                <button class="button button-primary" onclick="submitRound()" id="submit-button" disabled>
+                    Submit Round
+                </button>
+            </div>
+            
+            <div id="waiting-for-round" class="status hidden">
+                Waiting for opponent to submit...
+            </div>
+            
+            <div id="round-results" class="hidden">
+                <div class="results">
+                    <h3>Round Results</h3>
+                    <div id="results-content"></div>
+                </div>
+                
+                <button class="button button-secondary" onclick="newRound()">Next Round / Change Table</button>
+            </div>
+        </div>
+        
+
+        
+        <div id="error-message" class="error hidden"></div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            teamName: '',
+            tableCode: '',
+            budget: 500,
+            selectedChoice: null,
+            gameData: {}
+        };
+
+        // In-memory storage for demo
+        let gameDatabase = {};
+        let leaderboard = {};
+
+        function joinTable() {
+            const teamName = document.getElementById('team-name').value.trim();
+            const tableCode = document.getElementById('table-code').value.trim().toUpperCase();
+            
+            if (!teamName || !tableCode) {
+                showError('Please enter both team name and table code');
+                return;
+            }
+            
+            gameState.teamName = teamName;
+            gameState.tableCode = tableCode;
+            
+            // Initialize leaderboard entry
+            if (!leaderboard[teamName]) {
+                leaderboard[teamName] = { budget: 500, totalRounds: 0 };
+            } else {
+                gameState.budget = leaderboard[teamName].budget;
+            }
+            
+            // Initialize table
+            if (!gameDatabase[tableCode]) {
+                gameDatabase[tableCode] = {
+                    teamA: null,
+                    teamB: null,
+                    roundData: {},
+                    status: 'waiting'
+                };
+            }
+            
+            // Join table
+            const table = gameDatabase[tableCode];
+            if (!table.teamA) {
+                table.teamA = { name: teamName, budget: gameState.budget };
+            } else if (!table.teamB && table.teamA.name !== teamName) {
+                table.teamB = { name: teamName, budget: gameState.budget };
+            } else if (table.teamA.name === teamName) {
+                table.teamA.budget = gameState.budget;
+            } else if (table.teamB && table.teamB.name === teamName) {
+                table.teamB.budget = gameState.budget;
+            } else {
+                showError('Table is full or you are already in this table');
+                return;
+            }
+            
+            document.getElementById('setup-phase').classList.add('hidden');
+            document.getElementById('game-phase').classList.remove('hidden');
+            
+            updateGameState();
+        }
+
+        function updateGameState() {
+            const table = gameDatabase[gameState.tableCode];
+            if (!table) return;
+            
+            document.getElementById('current-budget').textContent = gameState.budget;
+            
+            // Update contribution options based on current budget
+            const contributionSelect = document.getElementById('contribution');
+            contributionSelect.innerHTML = '';
+            for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `$${i}`;
+                contributionSelect.appendChild(option);
+            }
+            
+            if (table.teamA && table.teamB) {
+                document.getElementById('waiting-for-opponent').classList.add('hidden');
+                document.getElementById('game-controls').classList.remove('hidden');
+            } else {
+                document.getElementById('waiting-for-opponent').classList.remove('hidden');
+                document.getElementById('game-controls').classList.add('hidden');
+            }
+        }
+
+        function selectChoice(choice) {
+            gameState.selectedChoice = choice;
+            
+            // Update button states
+            document.querySelectorAll('.choice-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            if (choice === 'black') {
+                document.querySelector('.choice-black').classList.add('selected');
+            } else {
+                document.querySelector('.choice-red').classList.add('selected');
+            }
+            
+            document.getElementById('submit-button').disabled = false;
+        }
+
+        function submitRound() {
+            if (!gameState.selectedChoice) {
+                showError('Please select Black or Red');
+                return;
+            }
+            
+            const contribution = parseInt(document.getElementById('contribution').value);
+            const actualContribution = gameState.selectedChoice === 'red' ? 0 : contribution;
+            
+            const table = gameDatabase[gameState.tableCode];
+            const isTeamA = table.teamA.name === gameState.teamName;
+            
+            if (isTeamA) {
+                table.roundData.teamA = {
+                    negotiated: contribution,
+                    actual: actualContribution,
+                    choice: gameState.selectedChoice
+                };
+            } else {
+                table.roundData.teamB = {
+                    negotiated: contribution,
+                    actual: actualContribution,
+                    choice: gameState.selectedChoice
+                };
+            }
+            
+            document.getElementById('game-controls').classList.add('hidden');
+            
+            if (table.roundData.teamA && table.roundData.teamB) {
+                calculateResults();
+            } else {
+                document.getElementById('waiting-for-round').classList.remove('hidden');
+                // Simulate opponent action for demo
+                setTimeout(() => {
+                    if (!table.roundData.teamA || !table.roundData.teamB) {
+                        simulateOpponent();
+                        calculateResults();
+                    }
+                }, Math.random() * 3000 + 2000);
+            }
+        }
+
+        function simulateOpponent() {
+            const table = gameDatabase[gameState.tableCode];
+            if (!table.roundData.teamA) {
+                const opponentBudget = table.teamA.budget;
+                const contribution = Math.floor(Math.random() * (opponentBudget / 100 + 1)) * 100;
+                const choice = Math.random() > 0.3 ? 'black' : 'red';
+                table.roundData.teamA = {
+                    negotiated: contribution,
+                    actual: choice === 'red' ? 0 : contribution,
+                    choice: choice
+                };
+            }
+            if (!table.roundData.teamB) {
+                const opponentBudget = table.teamB.budget;
+                const contribution = Math.floor(Math.random() * (opponentBudget / 100 + 1)) * 100;
+                const choice = Math.random() > 0.3 ? 'black' : 'red';
+                table.roundData.teamB = {
+                    negotiated: contribution,
+                    actual: choice === 'red' ? 0 : contribution,
+                    choice: choice
+                };
+            }
+        }
+
+        function calculateResults() {
+            const table = gameDatabase[gameState.tableCode];
+            const dataA = table.roundData.teamA;
+            const dataB = table.roundData.teamB;
+            
+            // Calculate public good returns
+            const totalContribution = dataA.actual + dataB.actual;
+            const publicGoodReturn = (totalContribution * 1.5) / 2;
+            
+            // Calculate new budgets
+            const newBudgetA = (table.teamA.budget - dataA.actual) + publicGoodReturn;
+            const newBudgetB = (table.teamB.budget - dataB.actual) + publicGoodReturn;
+            
+            // Update budgets
+            table.teamA.budget = Math.round(newBudgetA);
+            table.teamB.budget = Math.round(newBudgetB);
+            
+            // Update game state budget
+            if (table.teamA.name === gameState.teamName) {
+                gameState.budget = table.teamA.budget;
+            } else {
+                gameState.budget = table.teamB.budget;
+            }
+            
+            // Update leaderboard
+            leaderboard[table.teamA.name] = { 
+                budget: table.teamA.budget, 
+                totalRounds: (leaderboard[table.teamA.name]?.totalRounds || 0) + 1 
+            };
+            leaderboard[table.teamB.name] = { 
+                budget: table.teamB.budget, 
+                totalRounds: (leaderboard[table.teamB.name]?.totalRounds || 0) + 1 
+            };
+            
+            // Display results
+            showResults(dataA, dataB, publicGoodReturn);
+        }
+
+        function showResults(dataA, dataB, publicGoodReturn) {
+            const table = gameDatabase[gameState.tableCode];
+            const isTeamA = table.teamA.name === gameState.teamName;
+            const myData = isTeamA ? dataA : dataB;
+            const opponentData = isTeamA ? dataB : dataA;
+            const opponentName = isTeamA ? table.teamB.name : table.teamA.name;
+            
+            const resultsHTML = `
+                <div class="result-line">
+                    <span>Your negotiated:</span>
+                    <span>$${myData.negotiated}</span>
+                </div>
+                <div class="result-line">
+                    <span>Your actual:</span>
+                    <span>$${myData.actual} (${myData.choice.toUpperCase()})</span>
+                </div>
+                <div class="result-line">
+                    <span>${opponentName} negotiated:</span>
+                    <span>$${opponentData.negotiated}</span>
+                </div>
+                <div class="result-line">
+                    <span>${opponentName} actual:</span>
+                    <span>$${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
+                </div>
+                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
+                    <span>Public good return:</span>
+                    <span>$${Math.round(publicGoodReturn)}</span>
+                </div>
+                <div class="result-line">
+                    <span><strong>Your new budget:</strong></span>
+                    <span><strong>$${gameState.budget}</strong></span>
+                </div>
+            `;
+            
+            document.getElementById('results-content').innerHTML = resultsHTML;
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('round-results').classList.remove('hidden');
+        }
+
+        function newRound() {
+            // Reset for new round
+            gameState.selectedChoice = null;
+            
+            // Clear table round data
+            if (gameDatabase[gameState.tableCode]) {
+                gameDatabase[gameState.tableCode].roundData = {};
+            }
+            
+            // Reset UI
+            document.getElementById('round-results').classList.add('hidden');
+            document.getElementById('game-phase').classList.add('hidden');
+            document.getElementById('setup-phase').classList.remove('hidden');
+            
+            // Keep team name, clear table code for new assignment
+            document.getElementById('table-code').value = '';
+            document.querySelectorAll('.choice-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.getElementById('submit-button').disabled = true;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initialize app
+    </script>
+</body>
+</html>
