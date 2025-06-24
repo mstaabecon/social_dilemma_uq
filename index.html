@@ -199,7 +199,10 @@
             
             <div class="form-group">
                 <label for="table-code">Table Code</label>
-                <input type="text" id="table-code" placeholder="Enter table code (e.g. T1)">
+                <input type="text" id="table-code" placeholder="Enter your table code exactly as shown">
+                <small style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 5px; display: block;">
+                    Check the code on your physical table carefully
+                </small>
             </div>
             
             <button class="button button-primary" onclick="joinTable()">Join Table</button>
@@ -207,15 +210,25 @@
         
         <!-- Game Phase -->
         <div id="game-phase" class="hidden">
+            <div class="status" style="background: rgba(255, 255, 255, 0.15); margin-bottom: 15px;">
+                Team: <strong><span id="display-team-name"></span></strong> | 
+                Table: <strong><span id="display-table-code"></span></strong>
+            </div>
+            
             <div class="budget-display">
                 Budget: $<span id="current-budget">500</span>
             </div>
             
             <div id="waiting-for-opponent" class="status hidden">
-                Waiting for opponent team to join...
+                Waiting for opponent team to join...<br>
+                <small style="color: rgba(255,255,255,0.8);">Wrong table? Use the button below to try again</small><br>
+                <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
             </div>
             
             <div id="game-controls" class="hidden">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <button class="button button-secondary" onclick="cancelWaiting()" style="width: auto; padding: 8px 16px; font-size: 14px;">Leave This Table</button>
+                </div>
                 <div class="form-group">
                     <label for="contribution">Negotiated Contribution (multiples of 100)</label>
                     <select id="contribution">
@@ -292,6 +305,7 @@
 
         let currentTableRef = null;
         let isCalculating = false; // Prevent infinite loops
+        let isCalculating = false; // Prevent infinite loops
 
         async function joinTable() {
             const teamName = document.getElementById('team-name').value.trim();
@@ -304,6 +318,10 @@
             
             gameState.teamName = teamName;
             gameState.tableCode = tableCode;
+            
+            // Update display
+            document.getElementById('display-team-name').textContent = teamName;
+            document.getElementById('display-table-code').textContent = tableCode;
             
             try {
                 // Reference to this table
@@ -632,6 +650,38 @@
                 errorDiv.classList.add('hidden');
             }, 3000);
         }
+
+        async function cancelWaiting() {
+            try {
+                // Remove this team from current table
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                await database.ref(`tables/${gameState.tableCode}/${myTeamKey}`).remove();
+                
+                // Stop listening to current table
+                if (currentTableRef) {
+                    currentTableRef.off();
+                    currentTableRef = null;
+                }
+                
+                // Reset UI for table selection
+                document.getElementById('game-phase').classList.add('hidden');
+                document.getElementById('setup-phase').classList.remove('hidden');
+                document.getElementById('table-code').value = '';
+                
+                showError('Cancelled - you can now select a different table');
+                
+            } catch (error) {
+                console.error('Error cancelling:', error);
+                showError('Error cancelling. Please refresh the page.');
+            }
+        }
+        // Make functions globally accessible (fix for module scope issues)
+        window.joinTable = joinTable;
+        window.selectChoice = selectChoice;
+        window.submitRound = submitRound;
+        window.nextRound = nextRound;
+        window.changeTable = changeTable;
+        window.cancelWaiting = cancelWaiting;
     </script>
 </body>
 </html>
