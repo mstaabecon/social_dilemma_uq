@@ -508,11 +508,13 @@
                     timestamp: Date.now()
                 });
                 
-                updateDebug('Round data submitted to Firebase');
+                updateDebug(`✓ Submitted as ${myTeamKey} to Firebase`);
                 
                 // Hide controls and show waiting
                 document.getElementById('game-controls').classList.add('hidden');
                 document.getElementById('waiting-for-round').classList.remove('hidden');
+                
+                updateDebug('UI updated - now waiting for opponent or results');
                 
             } catch (error) {
                 console.error('Error submitting round:', error);
