@@ -253,8 +253,8 @@
                     <div id="results-content"></div>
                 </div>
                 
-                <button class="button button-secondary" onclick="nextRound()">Next Round (Same Table)</button>
-                <button class="button button-secondary" onclick="changeTable()">Change Table</button>
+                <button class="button button-secondary" onclick="nextRound()">Next Round</button>
+                <button class="button button-secondary" onclick="changeTable()">Change Table (Both Teams)</button>
             </div>
         </div>
         
@@ -371,6 +371,28 @@
         }
 
         function updateGameState(tableData) {
+            // Check if table change was initiated
+            if (tableData.changeTable) {
+                // Reset UI for table selection
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('game-phase').classList.add('hidden');
+                document.getElementById('setup-phase').classList.remove('hidden');
+                
+                gameState.selectedChoice = null;
+                document.getElementById('table-code').value = '';
+                document.querySelectorAll('.choice-button').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                document.getElementById('submit-button').disabled = true;
+                
+                // Stop listening to current table
+                if (currentTableRef) {
+                    currentTableRef.off();
+                    currentTableRef = null;
+                }
+                return;
+            }
+            
             document.getElementById('current-budget').textContent = gameState.budget;
             
             // Update contribution options
@@ -568,12 +590,15 @@
 
         async function changeTable() {
             try {
-                // Remove this team from current table
-                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                await database.ref(`tables/${gameState.tableCode}/${myTeamKey}`).remove();
+                // Signal both teams to change tables by setting a flag
+                await database.ref(`tables/${gameState.tableCode}/changeTable`).set(true);
                 
-                // Clear round data for this table
-                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
+                // Remove both teams from current table
+                await database.ref(`tables/${gameState.tableCode}/teamA`).remove();
+                await database.ref(`tables/${gameState.tableCode}/teamB`).remove();
+                
+                // Clear round data
+                await database.ref(`tables/${gameState.tableCode}/roundData`).remove();
                 
                 // Reset UI for table selection
                 document.getElementById('round-results').classList.add('hidden');
