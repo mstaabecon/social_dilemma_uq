@@ -459,10 +459,9 @@
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                // Count tables that are ready for processing (either waitingForAdmin OR both teams submitted)
+                // Count tables that are ready for processing - use fresh count each time
                 const readyTables = Object.values(tables).filter(table => 
-                    (table.waitingForAdmin && !table.resultsProcessed) ||
-                    (table.roundData && table.roundData.teamA && table.roundData.teamB && !table.resultsProcessed)
+                    table.roundData && table.roundData.teamA && table.roundData.teamB && !table.resultsProcessed
                 );
                 const waitingCount = readyTables.length;
                 const currentPhase = adminState.currentPhase || 'playing';
@@ -471,19 +470,22 @@
                     processBtn.textContent = `Process All Results (${waitingCount})`;
                     processBtn.disabled = false;
                     processBtn.style.opacity = '1';
+                    processBtn.style.backgroundColor = '#27ae60';
                     nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = true;
                     nextRoundBtn.style.opacity = '0.5';
                 } else if (currentPhase === 'results') {
-                    // In results phase, still allow processing if there are new tables ready
+                    // In results phase, always check for new tables
                     if (waitingCount > 0) {
                         processBtn.textContent = `Process New Results (${waitingCount})`;
                         processBtn.disabled = false;
                         processBtn.style.opacity = '1';
+                        processBtn.style.backgroundColor = '#27ae60';
                     } else {
                         processBtn.textContent = 'All Results Processed';
                         processBtn.disabled = true;
                         processBtn.style.opacity = '0.5';
+                        processBtn.style.backgroundColor = '#666';
                     }
                     nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = false;
@@ -677,18 +679,25 @@
                     }
                 }
                 
-                // Don't change phase if we're already in results - just process the new tables
-                if (adminState.currentPhase !== 'results') {
-                    updates['admin/currentPhase'] = 'results';
-                    updates['admin/allowNewRounds'] = false; // Don't allow next round until admin clicks
-                }
-                
                 if (processedCount > 0) {
+                    // Don't change phase if we're already in results - just process the new tables
+                    if (adminState.currentPhase !== 'results') {
+                        updates['admin/currentPhase'] = 'results';
+                        updates['admin/allowNewRounds'] = false; // Don't allow next round until admin clicks
+                    }
+                    
                     await database.ref().update(updates);
+                    
                     const phaseMessage = adminState.currentPhase === 'results' ? 
                         `Processed ${processedCount} additional rounds!` : 
                         `Processed ${processedCount} rounds! Students can now see results. Click "Start Next Round" when ready.`;
                     alert(phaseMessage);
+                    
+                    // Force UI update after processing
+                    setTimeout(() => {
+                        updateUI();
+                    }, 500);
+                    
                 } else {
                     alert('No completed rounds to process yet. Tables that are ready will be processed automatically as they finish.');
                 }
