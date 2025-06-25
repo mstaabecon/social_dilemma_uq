@@ -463,6 +463,7 @@
             const actualSelect = document.getElementById('actual-contribution');
             
             [negotiatedSelect, actualSelect].forEach(select => {
+                const currentValue = select.value; // Save current selection
                 select.innerHTML = '';
                 for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
                     const option = document.createElement('option');
@@ -470,6 +471,7 @@
                     option.textContent = `${i}`;
                     select.appendChild(option);
                 }
+                select.value = currentValue; // Restore selection
             });
             
             // Check if both teams are present
@@ -518,23 +520,8 @@
             } catch (error) {
                 console.error('Error updating negotiated contribution:', error);
             }
-        
-            gameState.selectedChoice = choice;
-            
-            // Update button states
-            document.querySelectorAll('.choice-button').forEach(btn => {
-                btn.classList.remove('selected');
-            });
-            
-            if (choice === 'black') {
-                document.querySelector('.choice-black').classList.add('selected');
-            } else {
-                document.querySelector('.choice-red').classList.add('selected');
-            }
-            
-            document.getElementById('submit-button').disabled = false;
         }
-
+ 
         async function submitRound() {
             const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
             const actualContribution = parseInt(document.getElementById('actual-contribution').value);
