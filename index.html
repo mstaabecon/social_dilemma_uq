@@ -442,23 +442,15 @@
             const nextRoundBtn = document.getElementById('next-round-btn');
             const adminMessage = document.getElementById('admin-message');
 
-            if (adminState.controlMode === 'controlled') {
-                if (showingResults && !adminState.allowNewRounds) {
-                    // Results are shown but admin hasn't allowed next round yet
-                    adminWaiting.classList.remove('hidden');
-                    adminMessage.textContent = 'Waiting for instructor to start the next round...';
-                    
-                    // Hide next round button
-                    if (nextRoundBtn) {
-                        nextRoundBtn.style.display = 'none';
-                    }
-                } else if (showingResults && adminState.allowNewRounds) {
-                    // Results shown and admin allows next round
-                    adminWaiting.classList.add('hidden');
-                    
-                    if (nextRoundBtn) {
-                        nextRoundBtn.style.display = 'inline-block';
-                    }
+            if (adminState.controlMode === 'controlled' && showingResults) {
+                // Always show waiting message and hide next round button in controlled mode
+                // Students can only advance when admin starts next round (which auto-resets them)
+                adminWaiting.classList.remove('hidden');
+                adminMessage.textContent = 'Waiting for instructor to start the next round...';
+                
+                // Always hide next round button in controlled mode
+                if (nextRoundBtn) {
+                    nextRoundBtn.style.display = 'none';
                 }
             }
         }
