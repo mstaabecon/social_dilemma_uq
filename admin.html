@@ -459,28 +459,19 @@
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                // Count completed tables (have round data)
-                const completedTables = Object.values(tables).filter(table => 
-                    table.roundData && table.roundData.teamA && table.roundData.teamB
-                );
-                const completedCount = completedTables.length;
-                
-                // Count tables waiting for next round (completed and results shown)
-                const waitingForNextRound = adminState.showResults ? completedCount : 0;
-                
                 if (!adminState.showResults) {
                     // Results are hidden
-                    toggleResultsBtn.textContent = `Show Results to Students (${completedCount} completed)`;
+                    toggleResultsBtn.textContent = 'Show Results to Students';
                     toggleResultsBtn.disabled = false;
                     toggleResultsBtn.className = 'button button-primary';
                     nextRoundBtn.textContent = 'Start Next Round';
-                    nextRoundBtn.disabled = completedCount === 0;
+                    nextRoundBtn.disabled = false;
                 } else {
                     // Results are visible
                     toggleResultsBtn.textContent = 'Hide Results from Students';
                     toggleResultsBtn.disabled = false;
                     toggleResultsBtn.className = 'button button-warning';
-                    nextRoundBtn.textContent = `Start Next Round (${waitingForNextRound} waiting)`;
+                    nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = false;
                 }
             }
@@ -655,11 +646,18 @@
                             updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
                             updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
                             
-                            // Increment rounds
+                            // Only increment rounds if this is a new round for the team
+                            // Check if team's round count is less than current admin round
                             const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
                             const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
-                            updates[`teams/${tableData.teamA.name}/totalRounds`] = teamACurrentRounds + 1;
-                            updates[`teams/${tableData.teamB.name}/totalRounds`] = teamBCurrentRounds + 1;
+                            const currentAdminRound = adminState.currentRound || 1;
+                            
+                            if (teamACurrentRounds < currentAdminRound) {
+                                updates[`teams/${tableData.teamA.name}/totalRounds`] = currentAdminRound;
+                            }
+                            if (teamBCurrentRounds < currentAdminRound) {
+                                updates[`teams/${tableData.teamB.name}/totalRounds`] = currentAdminRound;
+                            }
                             
                             processedCount++;
                         }
@@ -708,7 +706,7 @@
                 
                 await database.ref().update(updates);
                 
-                alert(`Round ${adminState.currentRound + 1} started! All teams can now negotiate and play.`);
+                alert(`Round ${(adminState.currentRound || 1) + 1} started! All teams can now negotiate and play.`);
                 
             } catch (error) {
                 console.error('Error starting next round:', error);
