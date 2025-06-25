@@ -253,7 +253,11 @@
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="negotiated-contribution">Your Negotiated Contribution (visible to opponent)</label>
+
+                            <label for="negotiated-contribution">Your Negotiated Contribution</label>
+                            <small style="color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 8px; display: block;">
+                            visible to opponent
+                            </small>
                             <select id="negotiated-contribution" onchange="updateNegotiatedContribution()">
                                 <option value="0">0</option>
                                 <option value="100">100</option>
@@ -265,7 +269,7 @@
                         </div>
                         
                         <button class="button button-primary" onclick="finalizeNegotiation()" id="finalize-button">
-                            Finalize Negotiation
+                            Finalise Negotiation
                         </button>
                     </div>
                 </div>
