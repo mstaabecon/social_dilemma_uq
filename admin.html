@@ -319,12 +319,12 @@
                 <div class="stat-label">Total Teams</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-completed-rounds">0</div>
-                <div class="stat-label">Completed Rounds</div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-value" id="stat-avg-budget">500</div>
                 <div class="stat-label">Average Budget</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-max-budget">500</div>
+                <div class="stat-label">Max Budget</div>
             </div>
         </div>
         
@@ -543,9 +543,10 @@
         function updateStats() {
             const activeTables = Object.keys(tables).length;
             const totalTeams = Object.keys(teams).length;
-            const completedRounds = Object.values(teams).reduce((sum, team) => sum + (team.totalRounds || 0), 0);
             const avgBudget = totalTeams > 0 ? 
                 Math.round(Object.values(teams).reduce((sum, team) => sum + (team.budget || 500), 0) / totalTeams) : 500;
+            const maxBudget = totalTeams > 0 ?
+                Math.max(...Object.values(teams).map(team => team.budget || 500)) : 500;
             const completedTables = Object.values(tables).filter(table => 
                 table.roundData && table.roundData.teamA && table.roundData.teamB
             ).length;
@@ -553,8 +554,8 @@
             
             document.getElementById('stat-active-tables').textContent = activeTables;
             document.getElementById('stat-total-teams').textContent = totalTeams;
-            document.getElementById('stat-completed-rounds').textContent = completedRounds;
             document.getElementById('stat-avg-budget').textContent = avgBudget;
+            document.getElementById('stat-max-budget').textContent = maxBudget;
             
             document.getElementById('active-tables').textContent = activeTables;
             document.getElementById('completed-tables').textContent = completedTables;
@@ -701,7 +702,7 @@
                 
                 await database.ref().update(updates);
                 
-                alert(`Round ${(adminState.currentRound || 1) + 1} started! All teams can now negotiate and play.`);
+                alert(`New round started! All teams can now negotiate and play.`);
                 
             } catch (error) {
                 console.error('Error starting next round:', error);

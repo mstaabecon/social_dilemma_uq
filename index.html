@@ -299,14 +299,24 @@
 
                 <!-- Phase 2: Actual Contribution -->
                 <div id="contribution-phase" class="hidden">
-                    <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                        <p style="text-align: center; margin-bottom: 15px; opacity: 0.9;">
-                            You negotiated: <strong><span id="negotiated-display">0</span></strong>
+                    <div style="background: rgba(0, 0, 0, 0.3); border: 2px solid rgba(255, 165, 0, 0.6); border-radius: 12px; padding: 20px; margin-bottom: 20px; position: relative;">
+                        <!-- SECRET badge -->
+                        <div style="position: absolute; top: -10px; right: 15px; background: #ff6b35; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; letter-spacing: 1px;">
+                            🔒 SECRET
+                        </div>
+                        
+                        <div style="text-align: center; margin-bottom: 15px; color: #ff6b35; font-weight: bold; font-size: 16px;">
+                            🔒 Private Decision Phase
+                        </div>
+                        
+                        <p style="text-align: center; margin-bottom: 15px; opacity: 0.9; font-size: 14px; color: #ffcc99;">
+                            You negotiated: <strong><span id="negotiated-display">0</span></strong><br>
+                            <em>Now decide your actual contribution (hidden from opponent)</em>
                         </p>
                         
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="actual-contribution">Your Actual Contribution (secret until both submit)</label>
-                            <select id="actual-contribution">
+                            <label for="actual-contribution" style="color: #ff6b35; font-weight: bold;">Your Actual Contribution (secret until both submit)</label>
+                            <select id="actual-contribution" style="border: 2px solid #ff6b35; background: rgba(255, 255, 255, 0.95);">
                                 <option value="0">0</option>
                                 <option value="100">100</option>
                                 <option value="200">200</option>
@@ -316,8 +326,8 @@
                             </select>
                         </div>
                         
-                        <button class="button button-primary" onclick="submitRound()" id="submit-button">
-                            Submit Round
+                        <button class="button button-primary" onclick="submitRound()" id="submit-button" style="background: #ff6b35; border: none;">
+                            🔒 Submit Secret Decision
                         </button>
                     </div>
                 </div>
