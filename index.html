@@ -302,6 +302,7 @@
 
         let currentTableRef = null;
         let isCalculating = false; // Prevent infinite loops
+        let showingResults = false; // Track if we're showing results
 
         async function joinTable() {
             const teamName = document.getElementById('team-name').value.trim();
@@ -435,8 +436,8 @@
                     // Both submitted, show results (with loop protection)
                     isCalculating = true;
                     calculateResults(tableData);
-                } else if (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey])) {
-                    // Ready to play (only if no round data exists)
+                } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
+                    // Ready to play (only if not showing results and no round data exists)
                     document.getElementById('game-controls').classList.remove('hidden');
                     document.getElementById('waiting-for-round').classList.add('hidden');
                     document.getElementById('round-results').classList.add('hidden');
@@ -580,6 +581,9 @@
             document.getElementById('waiting-for-round').classList.add('hidden');
             document.getElementById('game-controls').classList.add('hidden');
             document.getElementById('round-results').classList.remove('hidden');
+            
+            // Set flag to prevent game controls from reappearing
+            showingResults = true;
         }
 
         async function nextRound() {
@@ -589,6 +593,7 @@
                 
                 // Reset calculation flag for new round
                 isCalculating = false;
+                showingResults = false; // Allow game controls again
                 
                 // Reset UI for new round at same table
                 document.getElementById('round-results').classList.add('hidden');
