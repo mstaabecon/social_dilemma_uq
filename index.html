@@ -501,7 +501,6 @@
                 document.getElementById('game-controls').classList.add('hidden');
             }
         }
-        
 
         async function updateNegotiatedContribution() {
             const negotiatedAmount = document.getElementById('negotiated-contribution').value;
@@ -521,7 +520,8 @@
                 console.error('Error updating negotiated contribution:', error);
             }
         }
- 
+
+
         async function submitRound() {
             const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
             const actualContribution = parseInt(document.getElementById('actual-contribution').value);
@@ -642,6 +642,9 @@
                 // Clear round data for this table but keep teams
                 await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
                 
+                // Clear negotiation data 
+                await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
+                
                 // Reset calculation flag for new round
                 isCalculating = false;
                 showingResults = false; // Allow game controls again
@@ -650,11 +653,13 @@
                 document.getElementById('round-results').classList.add('hidden');
                 document.getElementById('game-controls').classList.remove('hidden');
                 
-                gameState.selectedChoice = null;
-                document.querySelectorAll('.choice-button').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
-                document.getElementById('submit-button').disabled = true;
+                // Reset negotiated displays
+                document.getElementById('my-negotiated').textContent = '--';
+                document.getElementById('opponent-negotiated').textContent = '--';
+                
+                // Reset dropdowns to first option
+                document.getElementById('negotiated-contribution').value = '0';
+                document.getElementById('actual-contribution').value = '0';
                 
             } catch (error) {
                 console.error('Error starting new round:', error);
