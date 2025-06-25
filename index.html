@@ -421,6 +421,24 @@
             // Handle centrally controlled mode
             if (adminState.controlMode === 'controlled') {
                 handleControlledMode();
+                
+                // Check if admin just enabled results display and we have complete round data
+                if (adminState.showResults && !showingResults) {
+                    // Get current table data to check if we should show results
+                    if (currentTableRef) {
+                        currentTableRef.once('value').then((snapshot) => {
+                            const tableData = snapshot.val();
+                            if (tableData && tableData.roundData && 
+                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
+                                // We have complete data and admin enabled results - show them now
+                                isCalculating = true;
+                                calculateResults(tableData);
+                            }
+                        }).catch((error) => {
+                            console.error('Error checking table data:', error);
+                        });
+                    }
+                }
             }
         }
 
