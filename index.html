@@ -226,6 +226,20 @@
             </div>
             
             <div id="game-controls" class="hidden">
+                <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 14px; opacity: 0.8;">Your Budget</div>
+                            <div style="font-size: 20px; font-weight: bold;">$<span id="my-budget">500</span></div>
+                        </div>
+                        <div style="font-size: 24px; opacity: 0.6;">vs</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 14px; opacity: 0.8;">Opponent Budget</div>
+                            <div style="font-size: 20px; font-weight: bold;">$<span id="opponent-budget">500</span></div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label for="contribution">Negotiated Contribution (multiples of 100)</label>
                     <select id="contribution">
@@ -409,6 +423,13 @@
             }
             
             document.getElementById('current-budget').textContent = gameState.budget;
+            document.getElementById('my-budget').textContent = gameState.budget;
+            
+            // Update opponent budget display
+            if (tableData.teamA && tableData.teamB) {
+                const opponentBudget = gameState.isTeamA ? tableData.teamB.budget : tableData.teamA.budget;
+                document.getElementById('opponent-budget').textContent = opponentBudget;
+            }
             
             // Update contribution options
             const contributionSelect = document.getElementById('contribution');
