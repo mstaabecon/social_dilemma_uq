@@ -142,6 +142,11 @@
             font-size: 16px;
         }
         
+        .admin-status {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid rgba(255, 193, 7, 0.5);
+        }
+        
         .budget-display {
             text-align: center;
             font-size: 24px;
@@ -172,6 +177,15 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
+        .round-info {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
         .hidden {
             display: none !important;
         }
@@ -189,6 +203,11 @@
 <body>
     <div class="container">
         <h1>🤝 The Social Dilemma</h1>
+        
+        <!-- Round Info Display -->
+        <div id="round-info" class="round-info hidden">
+            Round <span id="current-round-display">1</span>
+        </div>
         
         <!-- Setup Phase -->
         <div id="setup-phase">
@@ -219,6 +238,11 @@
                 Waiting for opponent team to join...<br>
                 <small style="color: rgba(255,255,255,0.8);">Wrong table? Use the button below to try again</small><br>
                 <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
+            </div>
+            
+            <div id="admin-waiting" class="status admin-status hidden">
+                <strong>Waiting for instructor...</strong><br>
+                <span id="admin-message">The instructor will start the next round soon.</span>
             </div>
             
             <div id="game-controls" class="hidden">
@@ -253,7 +277,6 @@
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 15px;">
-
                             <label for="negotiated-contribution">Your Negotiated Contribution</label>
                             <small style="color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 8px; display: block;">
                             visible to opponent
@@ -310,8 +333,10 @@
                     <div id="results-content"></div>
                 </div>
                 
-                <button class="button button-secondary" onclick="nextRound()">Next Round</button>
-                <button class="button button-secondary" onclick="changeTable()">Change Table (Both Teams)</button>
+                <div id="next-round-controls">
+                    <button class="button button-secondary" onclick="nextRound()" id="next-round-btn">Next Round</button>
+                    <button class="button button-secondary" onclick="changeTable()">Change Table (Both Teams)</button>
+                </div>
             </div>
         </div>
         
@@ -348,8 +373,94 @@
         };
 
         let currentTableRef = null;
-        let isCalculating = false; // Prevent infinite loops
-        let showingResults = false; // Track if we're showing results
+        let adminRef = null;
+        let isCalculating = false;
+        let showingResults = false;
+        let adminState = { controlMode: 'free', allowNewRounds: true, currentRound: 1 };
+
+        // Initialize admin listener
+        function initializeAdminListener() {
+            adminRef = database.ref('admin');
+            adminRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    adminState = data;
+                    updateRoundDisplay();
+                    handleAdminStateChange();
+                }
+            });
+        }
+
+        function updateRoundDisplay() {
+            const roundDisplay = document.getElementById('current-round-display');
+            const roundInfo = document.getElementById('round-info');
+            
+            if (adminState.currentRound) {
+                roundDisplay.textContent = adminState.currentRound;
+                roundInfo.classList.remove('hidden');
+            }
+        }
+
+        function handleAdminStateChange() {
+            // Handle force table reset
+            if (adminState.forceTableReset) {
+                handleForceTableReset();
+                return;
+            }
+
+            // Handle centrally controlled mode
+            if (adminState.controlMode === 'controlled') {
+                handleControlledMode();
+            }
+        }
+
+        function handleForceTableReset() {
+            // Force return to table selection
+            document.getElementById('game-phase').classList.add('hidden');
+            document.getElementById('setup-phase').classList.remove('hidden');
+            
+            // Clear current table
+            document.getElementById('table-code').value = '';
+            
+            // Show message
+            showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+            
+            // Stop listening to old table
+            if (currentTableRef) {
+                currentTableRef.off();
+                currentTableRef = null;
+            }
+
+            // Reset game state
+            gameState.selectedChoice = null;
+            showingResults = false;
+            isCalculating = false;
+        }
+
+        function handleControlledMode() {
+            const adminWaiting = document.getElementById('admin-waiting');
+            const nextRoundBtn = document.getElementById('next-round-btn');
+            const adminMessage = document.getElementById('admin-message');
+
+            if (!adminState.allowNewRounds && showingResults) {
+                // Show admin waiting message
+                adminWaiting.classList.remove('hidden');
+                adminMessage.textContent = 'Waiting for instructor to start the next round...';
+                
+                // Hide next round button
+                if (nextRoundBtn) {
+                    nextRoundBtn.style.display = 'none';
+                }
+            } else if (adminState.allowNewRounds) {
+                // Hide admin waiting message
+                adminWaiting.classList.add('hidden');
+                
+                // Show next round button
+                if (nextRoundBtn) {
+                    nextRoundBtn.style.display = 'inline-block';
+                }
+            }
+        }
 
         async function joinTable() {
             const teamName = document.getElementById('team-name').value.trim();
@@ -411,6 +522,9 @@
                     return;
                 }
                 
+                // Update current table reference in team record
+                await database.ref(`teams/${teamName}/currentTable`).set(tableCode);
+                
                 // Update table in Firebase
                 await currentTableRef.set(tableData);
                 
@@ -435,20 +549,7 @@
         function updateGameState(tableData) {
             // Check if table change was initiated
             if (tableData.changeTable) {
-                // Reset UI for table selection
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('game-phase').classList.add('hidden');
-                document.getElementById('setup-phase').classList.remove('hidden');
-                
-                gameState.selectedChoice = null;
-                document.getElementById('table-code').value = '';
-                document.getElementById('submit-button').disabled = true;
-                
-                // Stop listening to current table
-                if (currentTableRef) {
-                    currentTableRef.off();
-                    currentTableRef = null;
-                }
+                handleForceTableReset();
                 return;
             }
             
@@ -478,7 +579,7 @@
             const actualSelect = document.getElementById('actual-contribution');
             
             [negotiatedSelect, actualSelect].forEach(select => {
-                const currentValue = select.value; // Save current selection
+                const currentValue = select.value;
                 select.innerHTML = '';
                 for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
                     const option = document.createElement('option');
@@ -486,7 +587,7 @@
                     option.textContent = `${i}`;
                     select.appendChild(option);
                 }
-                select.value = currentValue; // Restore selection
+                select.value = currentValue;
             });
             
             // Check if both teams are present
@@ -502,21 +603,33 @@
                     document.getElementById('game-controls').classList.add('hidden');
                     document.getElementById('waiting-for-round').classList.remove('hidden');
                 } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
-                    // Both submitted, show results (with loop protection)
-                    isCalculating = true;
-                    calculateResults(tableData);
+                    // Both submitted, check if admin control is active
+                    if (adminState.controlMode === 'controlled' && !tableData.resultsProcessed) {
+                        // Wait for admin to process results
+                        document.getElementById('game-controls').classList.add('hidden');
+                        document.getElementById('waiting-for-round').classList.add('hidden');
+                        document.getElementById('admin-waiting').classList.remove('hidden');
+                        document.getElementById('admin-message').textContent = 'Waiting for instructor to process results...';
+                        
+                        // Mark table as waiting for admin
+                        database.ref(`tables/${gameState.tableCode}/waitingForAdmin`).set(true);
+                    } else {
+                        // Calculate results (either free mode or admin has processed)
+                        isCalculating = true;
+                        calculateResults(tableData);
+                    }
                 } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
-                    // Ready to play (only if not showing results and no round data exists)
+                    // Ready to play
                     document.getElementById('game-controls').classList.remove('hidden');
                     document.getElementById('waiting-for-round').classList.add('hidden');
                     document.getElementById('round-results').classList.add('hidden');
+                    document.getElementById('admin-waiting').classList.add('hidden');
                 }
             } else {
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
             }
         }
-    
 
         function finalizeNegotiation() {
             const negotiatedAmount = document.getElementById('negotiated-contribution').value;
@@ -593,6 +706,7 @@
                 const updates = {};
                 updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
                 updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                updates[`tables/${gameState.tableCode}/resultsProcessed`] = true;
                 
                 // Update team records
                 updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
@@ -619,7 +733,7 @@
             } catch (error) {
                 console.error('Error updating results:', error);
                 showError('Error calculating results. Please refresh.');
-                isCalculating = false; // Reset flag on error too
+                isCalculating = false;
             }
         }
 
@@ -658,10 +772,16 @@
             document.getElementById('results-content').innerHTML = resultsHTML;
             document.getElementById('waiting-for-round').classList.add('hidden');
             document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
             document.getElementById('round-results').classList.remove('hidden');
             
             // Set flag to prevent game controls from reappearing
             showingResults = true;
+            
+            // Handle admin control for next round
+            if (adminState.controlMode === 'controlled') {
+                handleControlledMode();
+            }
         }
 
         async function nextRound() {
@@ -672,13 +792,18 @@
                 // Clear negotiation data 
                 await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
                 
+                // Clear admin flags
+                await database.ref(`tables/${gameState.tableCode}/waitingForAdmin`).set(false);
+                await database.ref(`tables/${gameState.tableCode}/resultsProcessed`).set(false);
+                
                 // Reset calculation flag for new round
                 isCalculating = false;
-                showingResults = false; // Allow game controls again
+                showingResults = false;
                 
                 // Reset UI for new round at same table
                 document.getElementById('round-results').classList.add('hidden');
                 document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
                 
                 // Reset to negotiation phase
                 document.getElementById('contribution-phase').classList.add('hidden');
@@ -711,22 +836,7 @@
                 await database.ref(`tables/${gameState.tableCode}/roundData`).remove();
                 
                 // Reset UI for table selection
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('game-phase').classList.add('hidden');
-                document.getElementById('setup-phase').classList.remove('hidden');
-                
-                gameState.selectedChoice = null;
-                document.getElementById('table-code').value = '';
-                document.querySelectorAll('.choice-button').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
-                document.getElementById('submit-button').disabled = true;
-                
-                // Stop listening to current table
-                if (currentTableRef) {
-                    currentTableRef.off();
-                    currentTableRef = null;
-                }
+                handleForceTableReset();
                 
             } catch (error) {
                 console.error('Error changing table:', error);
@@ -741,6 +851,10 @@
             setTimeout(() => {
                 errorDiv.classList.add('hidden');
             }, 3000);
+        }
+
+        function showMessage(message) {
+            showError(message); // Reuse error display for general messages
         }
 
         async function cancelWaiting() {
@@ -767,7 +881,13 @@
                 showError('Error cancelling. Please refresh the page.');
             }
         }
-        // Make functions globally accessible (fix for module scope issues)
+
+        // Initialize admin listener when page loads
+        window.addEventListener('load', () => {
+            initializeAdminListener();
+        });
+
+        // Make functions globally accessible
         window.joinTable = joinTable;
         window.submitRound = submitRound;
         window.nextRound = nextRound;
@@ -778,3 +898,4 @@
     </script>
 </body>
 </html>
+                
