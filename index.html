@@ -376,7 +376,7 @@
         let adminRef = null;
         let isCalculating = false;
         let showingResults = false;
-        let adminState = { controlMode: 'free', allowNewRounds: true, currentRound: 1, roundLive: true };
+        let adminState = { controlMode: 'free', allowNewRounds: true, currentRound: 1, showResults: false };
 
         // Initialize admin listener
         function initializeAdminListener() {
@@ -443,29 +443,21 @@
             const adminMessage = document.getElementById('admin-message');
 
             if (adminState.controlMode === 'controlled') {
-                if (showingResults && adminState.roundLive) {
-                    // Results calculated but round is still live - hide them and show admin waiting
+                if (showingResults && !adminState.allowNewRounds) {
+                    // Results are shown but admin hasn't allowed next round yet
                     adminWaiting.classList.remove('hidden');
-                    adminMessage.textContent = 'Waiting for instructor to show results...';
+                    adminMessage.textContent = 'Waiting for instructor to start the next round...';
                     
                     // Hide next round button
                     if (nextRoundBtn) {
                         nextRoundBtn.style.display = 'none';
                     }
-                } else if (showingResults && !adminState.roundLive) {
-                    // Results have been shown by admin - allow next round when admin permits
+                } else if (showingResults && adminState.allowNewRounds) {
+                    // Results shown and admin allows next round
                     adminWaiting.classList.add('hidden');
                     
-                    if (!adminState.allowNewRounds) {
-                        adminWaiting.classList.remove('hidden');
-                        adminMessage.textContent = 'Waiting for instructor to start the next round...';
-                        if (nextRoundBtn) {
-                            nextRoundBtn.style.display = 'none';
-                        }
-                    } else {
-                        if (nextRoundBtn) {
-                            nextRoundBtn.style.display = 'inline-block';
-                        }
+                    if (nextRoundBtn) {
+                        nextRoundBtn.style.display = 'inline-block';
                     }
                 }
             }
@@ -562,9 +554,10 @@
                 return;
             }
             
-            // Check if admin started a new round (no round data exists)
-            if (adminState.controlMode === 'controlled' && adminState.roundLive && 
-                (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && showingResults) {
+            // Check if admin started a new round (no round data exists and we were showing results)
+            if (adminState.controlMode === 'controlled' && 
+                (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && 
+                showingResults) {
                 // Admin cleared the round data - reset to play new round
                 isCalculating = false;
                 showingResults = false;
@@ -636,18 +629,18 @@
                     document.getElementById('game-controls').classList.add('hidden');
                     document.getElementById('waiting-for-round').classList.remove('hidden');
                 } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
-                    // Both submitted - check admin control
+                    // Both teams have submitted - check what to do based on admin control
                     if (adminState.controlMode === 'controlled') {
-                        if (adminState.roundLive) {
-                            // Round is live but admin hasn't shown results yet
+                        if (adminState.showResults) {
+                            // Admin has enabled results display - show results immediately
+                            isCalculating = true;
+                            calculateResults(tableData);
+                        } else {
+                            // Admin hasn't enabled results yet - show waiting message
                             document.getElementById('game-controls').classList.add('hidden');
                             document.getElementById('waiting-for-round').classList.add('hidden');
                             document.getElementById('admin-waiting').classList.remove('hidden');
                             document.getElementById('admin-message').textContent = 'Waiting for instructor to show results...';
-                        } else {
-                            // Admin has shown results - calculate and display them
-                            isCalculating = true;
-                            calculateResults(tableData);
                         }
                     } else {
                         // Free mode - calculate results immediately

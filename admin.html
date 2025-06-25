@@ -300,11 +300,11 @@
         
         <!-- Round Info -->
         <div class="round-info">
-            <h2>Round <span id="current-round">1</span> - Status: <span id="round-status">Live</span></h2>
+            <h2>Round <span id="current-round">1</span> - Results: <span id="results-status">Hidden</span></h2>
             <div class="table-summary">
                 <span id="active-tables">0</span> active tables, 
                 <span id="completed-tables">0</span> completed this round,
-                <span id="total-teams">0</span> teams playing
+                <span id="waiting-next-round">0</span> waiting for next round
             </div>
         </div>
         
@@ -331,11 +331,11 @@
         <!-- Admin Actions -->
         <div class="admin-actions">
             <div class="controlled-only">
-                <button class="button button-primary" onclick="showAllResults()" id="show-results-btn">
-                    Show All Results
+                <button class="button button-primary" onclick="toggleResultsDisplay()" id="toggle-results-btn">
+                    Show Results to Students
                 </button>
                 <button class="button button-secondary" onclick="startNextRound()" id="next-round-btn">
-                    Process Results & Start Next Round
+                    Start Next Round
                 </button>
             </div>
             <button class="button button-warning" onclick="resetAllTables()" id="reset-btn">
@@ -387,7 +387,7 @@
         let adminState = {
             controlMode: 'free',
             currentRound: 1,
-            roundLive: true, // New: indicates if teams can play this round
+            showResults: false, // New: controls whether results are visible to students
             allowNewRounds: true,
             processingResults: false,
             forceTableReset: false
@@ -450,38 +450,44 @@
             // Update body class for conditional styling
             document.body.className = adminState.controlMode === 'controlled' ? 'controlled-mode' : '';
             
-            // Update round and status display
+            // Update round and results status display
             document.getElementById('current-round').textContent = adminState.currentRound || 1;
-            document.getElementById('round-status').textContent = adminState.roundLive ? 'Live' : 'Results Shown';
+            document.getElementById('results-status').textContent = adminState.showResults ? 'Visible' : 'Hidden';
             
             // Update button states
-            const showResultsBtn = document.getElementById('show-results-btn');
+            const toggleResultsBtn = document.getElementById('toggle-results-btn');
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                // Count completed tables (have round data but results not shown yet)
+                // Count completed tables (have round data)
                 const completedTables = Object.values(tables).filter(table => 
-                    table.roundData && table.roundData.teamA && table.roundData.teamB && adminState.roundLive
+                    table.roundData && table.roundData.teamA && table.roundData.teamB
                 );
                 const completedCount = completedTables.length;
                 
-                if (adminState.roundLive) {
-                    // Round is live - teams can play, results are hidden
-                    showResultsBtn.textContent = `Show All Results (${completedCount} completed)`;
-                    showResultsBtn.disabled = completedCount === 0;
-                    nextRoundBtn.textContent = 'Process Results & Start Next Round';
-                } else {
-                    // Results have been shown
-                    showResultsBtn.textContent = 'All Results Shown';
-                    showResultsBtn.disabled = true;
-                    showResultsBtn.style.opacity = '0.5';
+                // Count tables waiting for next round (completed and results shown)
+                const waitingForNextRound = adminState.showResults ? completedCount : 0;
+                
+                if (!adminState.showResults) {
+                    // Results are hidden
+                    toggleResultsBtn.textContent = `Show Results to Students (${completedCount} completed)`;
+                    toggleResultsBtn.disabled = false;
+                    toggleResultsBtn.className = 'button button-primary';
                     nextRoundBtn.textContent = 'Start Next Round';
+                    nextRoundBtn.disabled = completedCount === 0;
+                } else {
+                    // Results are visible
+                    toggleResultsBtn.textContent = 'Hide Results from Students';
+                    toggleResultsBtn.disabled = false;
+                    toggleResultsBtn.className = 'button button-warning';
+                    nextRoundBtn.textContent = `Start Next Round (${waitingForNextRound} waiting)`;
+                    nextRoundBtn.disabled = false;
                 }
             }
         }
 
-        function getRoundStatusName(roundLive) {
-            return roundLive ? 'Live' : 'Results Shown';
+        function getResultsStatusName(showResults) {
+            return showResults ? 'Visible' : 'Hidden';
         }
 
         function updateTablesDisplay() {
@@ -553,6 +559,7 @@
             const completedTables = Object.values(tables).filter(table => 
                 table.roundData && table.roundData.teamA && table.roundData.teamB
             ).length;
+            const waitingNextRound = adminState.showResults ? completedTables : 0;
             
             document.getElementById('stat-active-tables').textContent = activeTables;
             document.getElementById('stat-total-teams').textContent = totalTeams;
@@ -561,7 +568,7 @@
             
             document.getElementById('active-tables').textContent = activeTables;
             document.getElementById('completed-tables').textContent = completedTables;
-            document.getElementById('total-teams').textContent = totalTeams;
+            document.getElementById('waiting-next-round').textContent = waitingNextRound;
         }
 
         function getTableStatus(tableData) {
@@ -570,10 +577,10 @@
             }
             
             if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
-                if (adminState.roundLive) {
-                    return { type: 'ready', icon: '✅', text: 'Round Complete (Results Hidden)' };
+                if (!adminState.showResults) {
+                    return { type: 'ready', icon: '⏸️', text: 'Round Complete (Results Hidden)' };
                 } else {
-                    return { type: 'ready', icon: '📊', text: 'Results Shown' };
+                    return { type: 'ready', icon: '📊', text: 'Results Visible - Waiting for Next Round' };
                 }
             }
             
@@ -604,7 +611,7 @@
             try {
                 const updates = {
                     'admin/controlMode': selectedMode,
-                    'admin/roundLive': true
+                    'admin/showResults': false
                 };
                 
                 if (selectedMode === 'free') {
@@ -618,76 +625,15 @@
             }
         }
 
-        async function showAllResults() {
+        async function toggleResultsDisplay() {
             try {
-                const updates = {};
-                let processedCount = 0;
+                const newShowResults = !adminState.showResults;
                 
-                // Process all completed tables
-                for (let tableCode in tables) {
-                    const tableData = tables[tableCode];
+                if (newShowResults) {
+                    // Showing results - process all completed tables
+                    const updates = {};
+                    let processedCount = 0;
                     
-                    if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
-                        // Calculate results
-                        const dataA = tableData.roundData.teamA;
-                        const dataB = tableData.roundData.teamB;
-                        const totalContribution = dataA.actual + dataB.actual;
-                        const publicGoodReturn = (totalContribution * 1.5) / 2;
-                        
-                        const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
-                        const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
-                        
-                        // Update budgets
-                        updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
-                        updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
-                        
-                        // Update team records
-                        updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
-                        updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
-                        
-                        // Increment rounds
-                        const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
-                        const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
-                        updates[`teams/${tableData.teamA.name}/totalRounds`] = teamACurrentRounds + 1;
-                        updates[`teams/${tableData.teamB.name}/totalRounds`] = teamBCurrentRounds + 1;
-                        
-                        processedCount++;
-                    }
-                }
-                
-                // Mark round as no longer live (results are now shown)
-                updates['admin/roundLive'] = false;
-                updates['admin/allowNewRounds'] = false;
-                
-                await database.ref().update(updates);
-                
-                if (processedCount > 0) {
-                    alert(`Results shown for ${processedCount} completed tables! Students can now see their results.`);
-                } else {
-                    alert('No completed tables to show results for yet.');
-                }
-                
-            } catch (error) {
-                console.error('Error showing results:', error);
-                alert('Error showing results. Check console for details.');
-            }
-        }
-
-        async function startNextRound() {
-            const confirmMessage = adminState.roundLive ? 
-                'This will process any remaining results and start the next round. Continue?' :
-                'Start the next round? This will clear current results and allow teams to play again.';
-                
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-            
-            try {
-                const updates = {};
-                let processedCount = 0;
-                
-                // If round is still live, process any remaining results first
-                if (adminState.roundLive) {
                     for (let tableCode in tables) {
                         const tableData = tables[tableCode];
                         
@@ -718,7 +664,36 @@
                             processedCount++;
                         }
                     }
+                    
+                    // Set results as visible
+                    updates['admin/showResults'] = true;
+                    
+                    await database.ref().update(updates);
+                    
+                    if (processedCount > 0) {
+                        alert(`Results now visible to ${processedCount} completed tables!`);
+                    } else {
+                        alert('Results display toggled, but no completed tables to show results for.');
+                    }
+                } else {
+                    // Hiding results (probably rare, but possible)
+                    await database.ref('admin/showResults').set(false);
+                    alert('Results are now hidden from students.');
                 }
+                
+            } catch (error) {
+                console.error('Error toggling results display:', error);
+                alert('Error toggling results display. Check console for details.');
+            }
+        }
+
+        async function startNextRound() {
+            if (!confirm('Start the next round? This will clear all current round data and allow teams to play again.')) {
+                return;
+            }
+            
+            try {
+                const updates = {};
                 
                 // Clear all round data but keep teams at tables
                 for (let tableCode in tables) {
@@ -728,16 +703,12 @@
                 
                 // Update admin state for new round
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
-                updates['admin/roundLive'] = true;
+                updates['admin/showResults'] = false; // Hide results for new round
                 updates['admin/allowNewRounds'] = true;
                 
                 await database.ref().update(updates);
                 
-                const message = processedCount > 0 ? 
-                    `Processed ${processedCount} remaining results and started Round ${adminState.currentRound + 1}!` :
-                    `Round ${adminState.currentRound + 1} started! Teams can now negotiate and play.`;
-                    
-                alert(message);
+                alert(`Round ${adminState.currentRound + 1} started! All teams can now negotiate and play.`);
                 
             } catch (error) {
                 console.error('Error starting next round:', error);
@@ -805,7 +776,7 @@
 
         // Make functions globally accessible
         window.changeControlMode = changeControlMode;
-        window.showAllResults = showAllResults;
+        window.toggleResultsDisplay = toggleResultsDisplay;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
         window.exportData = exportData;
