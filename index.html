@@ -239,10 +239,37 @@
                         </div>
                     </div>
                 </div>
+
+                <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="text-align: center; margin-bottom: 15px;">📢 Public Negotiated Contributions</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 14px; opacity: 0.8;">You Negotiated</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #4CAF50;">$<span id="my-negotiated">--</span></div>
+                        </div>
+                        <div style="font-size: 20px; opacity: 0.6;">🤝</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 14px; opacity: 0.8;">Opponent Negotiated</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #4CAF50;">$<span id="opponent-negotiated">--</span></div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="form-group">
-                    <label for="contribution">Negotiated Contribution (multiples of 100)</label>
-                    <select id="contribution">
+                    <label for="negotiated-contribution">📢 Your Negotiated Contribution (visible to opponent)</label>
+                    <select id="negotiated-contribution" onchange="updateNegotiatedContribution()">
+                        <option value="0">$0</option>
+                        <option value="100">$100</option>
+                        <option value="200">$200</option>
+                        <option value="300">$300</option>
+                        <option value="400">$400</option>
+                        <option value="500">$500</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="actual-contribution">🔒 Your Actual Contribution (secret until both submit)</label>
+                    <select id="actual-contribution">
                         <option value="0">$0</option>
                         <option value="100">$100</option>
                         <option value="200">$200</option>
@@ -252,17 +279,7 @@
                     </select>
                 </div>
                 
-                <label>Secret Choice</label>
-                <div class="choice-buttons">
-                    <button class="choice-button choice-black" onclick="selectChoice('black')">
-                        ⚫ BLACK<br><small>Honor agreement</small>
-                    </button>
-                    <button class="choice-button choice-red" onclick="selectChoice('red')">
-                        🔴 RED<br><small>Contribute $0</small>
-                    </button>
-                </div>
-                
-                <button class="button button-primary" onclick="submitRound()" id="submit-button" disabled>
+                <button class="button button-primary" onclick="submitRound()" id="submit-button">
                     Submit Round
                 </button>
             </div>
@@ -409,9 +426,6 @@
                 
                 gameState.selectedChoice = null;
                 document.getElementById('table-code').value = '';
-                document.querySelectorAll('.choice-button').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
                 document.getElementById('submit-button').disabled = true;
                 
                 // Stop listening to current table
@@ -429,17 +443,34 @@
             if (tableData.teamA && tableData.teamB) {
                 const opponentBudget = gameState.isTeamA ? tableData.teamB.budget : tableData.teamA.budget;
                 document.getElementById('opponent-budget').textContent = opponentBudget;
+                
+                // Update negotiated contributions display
+                if (tableData.negotiations) {
+                    const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                    const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+                    
+                    if (tableData.negotiations[myTeamKey]) {
+                        document.getElementById('my-negotiated').textContent = tableData.negotiations[myTeamKey].amount;
+                    }
+                    if (tableData.negotiations[opponentKey]) {
+                        document.getElementById('opponent-negotiated').textContent = tableData.negotiations[opponentKey].amount;
+                    }
+                }
             }
             
-            // Update contribution options
-            const contributionSelect = document.getElementById('contribution');
-            contributionSelect.innerHTML = '';
-            for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = `$${i}`;
-                contributionSelect.appendChild(option);
-            }
+            // Update contribution options based on current budget
+            const negotiatedSelect = document.getElementById('negotiated-contribution');
+            const actualSelect = document.getElementById('actual-contribution');
+            
+            [negotiatedSelect, actualSelect].forEach(select => {
+                select.innerHTML = '';
+                for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `${i}`;
+                    select.appendChild(option);
+                }
+            });
             
             // Check if both teams are present
             if (tableData.teamA && tableData.teamB) {
@@ -469,7 +500,24 @@
             }
         }
 
-        function selectChoice(choice) {
+        async function updateNegotiatedContribution() {
+            const negotiatedAmount = document.getElementById('negotiated-contribution').value;
+            
+            try {
+                // Update negotiated contribution in Firebase so opponent can see it
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                await database.ref(`tables/${gameState.tableCode}/negotiations/${myTeamKey}`).set({
+                    amount: parseInt(negotiatedAmount),
+                    timestamp: Date.now()
+                });
+                
+                // Update own display
+                document.getElementById('my-negotiated').textContent = negotiatedAmount;
+                
+            } catch (error) {
+                console.error('Error updating negotiated contribution:', error);
+            }
+        }
             gameState.selectedChoice = choice;
             
             // Update button states
@@ -487,13 +535,8 @@
         }
 
         async function submitRound() {
-            if (!gameState.selectedChoice) {
-                showError('Please select Black or Red');
-                return;
-            }
-            
-            const contribution = parseInt(document.getElementById('contribution').value);
-            const actualContribution = gameState.selectedChoice === 'red' ? 0 : contribution;
+            const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
+            const actualContribution = parseInt(document.getElementById('actual-contribution').value);
             
             try {
                 // Submit this team's data to Firebase
@@ -501,9 +544,8 @@
                 const roundDataRef = database.ref(`tables/${gameState.tableCode}/roundData/${myTeamKey}`);
                 
                 await roundDataRef.set({
-                    negotiated: contribution,
+                    negotiated: negotiatedContribution,
                     actual: actualContribution,
-                    choice: gameState.selectedChoice,
                     timestamp: Date.now()
                 });
                 
@@ -574,27 +616,27 @@
             const resultsHTML = `
                 <div class="result-line">
                     <span>Your negotiated:</span>
-                    <span>$${myData.negotiated}</span>
+                    <span>${myData.negotiated}</span>
                 </div>
                 <div class="result-line">
                     <span>Your actual:</span>
-                    <span>$${myData.actual} (${myData.choice.toUpperCase()})</span>
+                    <span>${myData.actual}</span>
                 </div>
                 <div class="result-line">
                     <span>${opponentName} negotiated:</span>
-                    <span>$${opponentData.negotiated}</span>
+                    <span>${opponentData.negotiated}</span>
                 </div>
                 <div class="result-line">
                     <span>${opponentName} actual:</span>
-                    <span>$${opponentData.actual} (${opponentData.choice.toUpperCase()})</span>
+                    <span>${opponentData.actual}</span>
                 </div>
                 <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
                     <span>Public good return:</span>
-                    <span>$${Math.round(publicGoodReturn)}</span>
+                    <span>${Math.round(publicGoodReturn)}</span>
                 </div>
                 <div class="result-line">
                     <span><strong>Your new budget:</strong></span>
-                    <span><strong>$${gameState.budget}</strong></span>
+                    <span><strong>${gameState.budget}</strong></span>
                 </div>
             `;
             
@@ -703,11 +745,11 @@
         }
         // Make functions globally accessible (fix for module scope issues)
         window.joinTable = joinTable;
-        window.selectChoice = selectChoice;
         window.submitRound = submitRound;
         window.nextRound = nextRound;
         window.changeTable = changeTable;
         window.cancelWaiting = cancelWaiting;
+        window.updateNegotiatedContribution = updateNegotiatedContribution;
     </script>
 </body>
 </html>
