@@ -341,6 +341,9 @@
             <button class="button button-warning" onclick="resetAllTables()" id="reset-btn">
                 Reset All Tables & Force Re-pairing
             </button>
+            <button class="button button-secondary" onclick="changePassword()">
+                Change Admin Password
+            </button>
             <button class="button button-secondary" onclick="exportData()">
                 Export Game Data
             </button>
@@ -390,7 +393,8 @@
             showResults: false, // New: controls whether results are visible to students
             allowNewRounds: true,
             processingResults: false,
-            forceTableReset: false
+            forceTableReset: false,
+            adminPassword: 'admin123' // Default password
         };
 
         let tables = {};
@@ -406,7 +410,7 @@
                 if (!adminSnapshot.exists()) {
                     await adminRef.set(adminState);
                 } else {
-                    adminState = adminSnapshot.val();
+                    adminState = { ...adminState, ...adminSnapshot.val() };
                 }
                 
                 // Set up listeners
@@ -738,6 +742,40 @@
             }
         }
 
+        async function changePassword() {
+            const currentPasswordRef = database.ref('admin/adminPassword');
+            
+            try {
+                const currentPasswordSnapshot = await currentPasswordRef.once('value');
+                const currentPassword = currentPasswordSnapshot.val() || 'admin123';
+                
+                const enteredCurrentPassword = prompt("Enter current admin password:");
+                if (enteredCurrentPassword !== currentPassword) {
+                    alert("Incorrect current password.");
+                    return;
+                }
+                
+                const newPassword = prompt("Enter new admin password:");
+                if (!newPassword || newPassword.trim() === '') {
+                    alert("Password cannot be empty.");
+                    return;
+                }
+                
+                const confirmPassword = prompt("Confirm new admin password:");
+                if (newPassword !== confirmPassword) {
+                    alert("Passwords do not match.");
+                    return;
+                }
+                
+                await currentPasswordRef.set(newPassword);
+                alert("Admin password changed successfully!");
+                
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('Error changing password. Check console for details.');
+            }
+        }
+
         async function exportData() {
             try {
                 const data = {
@@ -764,19 +802,36 @@
         }
 
         // Simple admin access check
-        function checkAdminAccess() {
-            const password = prompt("Enter admin password:");
-            if (password !== "admin123") {
-                alert("Access denied");
-                window.location.href = "index.html";
-                return false;
+        async function checkAdminAccess() {
+            try {
+                // Get current password from database
+                const passwordRef = database.ref('admin/adminPassword');
+                const passwordSnapshot = await passwordRef.once('value');
+                const currentPassword = passwordSnapshot.val() || 'admin123';
+                
+                const enteredPassword = prompt("Enter admin password:");
+                if (enteredPassword !== currentPassword) {
+                    alert("Access denied");
+                    window.location.href = "index.html";
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Error checking admin access:', error);
+                // Fallback to default password if database error
+                const enteredPassword = prompt("Enter admin password:");
+                if (enteredPassword !== 'admin123') {
+                    alert("Access denied");
+                    window.location.href = "index.html";
+                    return false;
+                }
+                return true;
             }
-            return true;
         }
 
         // Initialize when page loads
-        window.addEventListener('load', () => {
-            if (checkAdminAccess()) {
+        window.addEventListener('load', async () => {
+            if (await checkAdminAccess()) {
                 initializeAdmin();
             }
         });
@@ -786,6 +841,7 @@
         window.toggleResultsDisplay = toggleResultsDisplay;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
+        window.changePassword = changePassword;
         window.exportData = exportData;
     </script>
 </body>
