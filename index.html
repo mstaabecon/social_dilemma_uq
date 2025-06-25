@@ -790,13 +790,10 @@
             }
         }
 
-        function showResults(dataA, dataB, publicGoodReturn, tableData) {
+        function showResults(dataA, dataB, publicGoodReturn, tableData, originalBudget) {
             const myData = gameState.isTeamA ? dataA : dataB;
             const opponentData = gameState.isTeamA ? dataB : dataA;
             const opponentName = gameState.isTeamA ? tableData.teamB.name : tableData.teamA.name;
-            
-            // Get the original budget before contribution
-            const originalBudget = gameState.isTeamA ? tableData.teamA.budget : tableData.teamB.budget;
             
             const resultsHTML = `
                 <div class="result-line">
