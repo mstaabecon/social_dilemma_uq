@@ -530,8 +530,7 @@
                     <div class="team-item">
                         <div class="team-name">${teamName}</div>
                         <div class="team-stats">
-                            Budget: ${teamData.budget || 500} | 
-                            Rounds: ${teamData.totalRounds || 0}
+                            Budget: ${teamData.budget || 500}
                             ${teamData.currentTable ? ` | Table: ${teamData.currentTable}` : ''}
                         </div>
                     </div>
@@ -686,10 +685,6 @@
         }
 
         async function startNextRound() {
-            if (!confirm('Start the next round? This will clear all current round data and allow teams to play again.')) {
-                return;
-            }
-            
             try {
                 const updates = {};
                 
