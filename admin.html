@@ -464,7 +464,7 @@
                 
                 if (currentPhase === 'playing') {
                     processBtn.textContent = `Process All Results (${waitingCount})`;
-                    processBtn.disabled = waitingCount === 0;
+                    processBtn.disabled = false; // Always allow processing
                     nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = true;
                     nextRoundBtn.style.opacity = '0.5';
@@ -668,7 +668,7 @@
                     await database.ref().update(updates);
                     alert(`Processed ${processedCount} rounds! Students can now see results. Click "Start Next Round" when ready.`);
                 } else {
-                    alert('No rounds ready for processing.');
+                    alert('No completed rounds to process yet. Tables that are ready will be processed automatically as they finish.');
                 }
                 
             } catch (error) {
