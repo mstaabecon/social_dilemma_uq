@@ -624,62 +624,12 @@
             try {
                 const newShowResults = !adminState.showResults;
                 
+                // Simply toggle the display flag - no calculations here
+                await database.ref('admin/showResults').set(newShowResults);
+                
                 if (newShowResults) {
-                    // Showing results - process all completed tables
-                    const updates = {};
-                    let processedCount = 0;
-                    
-                    for (let tableCode in tables) {
-                        const tableData = tables[tableCode];
-                        
-                        if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
-                            // Calculate results
-                            const dataA = tableData.roundData.teamA;
-                            const dataB = tableData.roundData.teamB;
-                            const totalContribution = dataA.actual + dataB.actual;
-                            const publicGoodReturn = (totalContribution * 1.5) / 2;
-                            
-                            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
-                            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
-                            
-                            // Update budgets
-                            updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
-                            updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
-                            
-                            // Update team records
-                            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
-                            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
-                            
-                            // Only increment rounds if this is a new round for the team
-                            // Check if team's round count is less than current admin round
-                            const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
-                            const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
-                            const currentAdminRound = adminState.currentRound || 1;
-                            
-                            if (teamACurrentRounds < currentAdminRound) {
-                                updates[`teams/${tableData.teamA.name}/totalRounds`] = currentAdminRound;
-                            }
-                            if (teamBCurrentRounds < currentAdminRound) {
-                                updates[`teams/${tableData.teamB.name}/totalRounds`] = currentAdminRound;
-                            }
-                            
-                            processedCount++;
-                        }
-                    }
-                    
-                    // Set results as visible
-                    updates['admin/showResults'] = true;
-                    
-                    await database.ref().update(updates);
-                    
-                    if (processedCount > 0) {
-                        alert(`Results now visible to ${processedCount} completed tables!`);
-                    } else {
-                        alert('Results display toggled, but no completed tables to show results for.');
-                    }
+                    alert('Results are now visible to students!');
                 } else {
-                    // Hiding results (probably rare, but possible)
-                    await database.ref('admin/showResults').set(false);
                     alert('Results are now hidden from students.');
                 }
                 

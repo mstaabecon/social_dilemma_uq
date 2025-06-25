@@ -730,7 +730,7 @@
             
             // Calculate public good returns
             const totalContribution = dataA.actual + dataB.actual;
-            const publicGoodReturn = (totalContribution * 1.5) / 2;
+            const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 = 0.75 per player
             
             // Calculate new budgets
             const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
