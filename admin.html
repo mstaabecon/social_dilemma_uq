@@ -469,14 +469,22 @@
                 
                 if (currentPhase === 'playing') {
                     processBtn.textContent = `Process All Results (${waitingCount})`;
-                    processBtn.disabled = false; // Always allow processing
+                    processBtn.disabled = false;
+                    processBtn.style.opacity = '1';
                     nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = true;
                     nextRoundBtn.style.opacity = '0.5';
                 } else if (currentPhase === 'results') {
-                    processBtn.textContent = 'All Results Processed';
-                    processBtn.disabled = true;
-                    processBtn.style.opacity = '0.5';
+                    // In results phase, still allow processing if there are new tables ready
+                    if (waitingCount > 0) {
+                        processBtn.textContent = `Process New Results (${waitingCount})`;
+                        processBtn.disabled = false;
+                        processBtn.style.opacity = '1';
+                    } else {
+                        processBtn.textContent = 'All Results Processed';
+                        processBtn.disabled = true;
+                        processBtn.style.opacity = '0.5';
+                    }
                     nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = false;
                     nextRoundBtn.style.opacity = '1';
@@ -669,13 +677,18 @@
                     }
                 }
                 
-                // Update phase to results
-                updates['admin/currentPhase'] = 'results';
-                updates['admin/allowNewRounds'] = false; // Don't allow next round until admin clicks
+                // Don't change phase if we're already in results - just process the new tables
+                if (adminState.currentPhase !== 'results') {
+                    updates['admin/currentPhase'] = 'results';
+                    updates['admin/allowNewRounds'] = false; // Don't allow next round until admin clicks
+                }
                 
                 if (processedCount > 0) {
                     await database.ref().update(updates);
-                    alert(`Processed ${processedCount} rounds! Students can now see results. Click "Start Next Round" when ready.`);
+                    const phaseMessage = adminState.currentPhase === 'results' ? 
+                        `Processed ${processedCount} additional rounds!` : 
+                        `Processed ${processedCount} rounds! Students can now see results. Click "Start Next Round" when ready.`;
+                    alert(phaseMessage);
                 } else {
                     alert('No completed rounds to process yet. Tables that are ready will be processed automatically as they finish.');
                 }
