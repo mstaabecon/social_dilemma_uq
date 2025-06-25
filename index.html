@@ -562,6 +562,30 @@
                 return;
             }
             
+            // Check if admin started a new round (no round data exists)
+            if (adminState.controlMode === 'controlled' && adminState.roundLive && 
+                (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && showingResults) {
+                // Admin cleared the round data - reset to play new round
+                isCalculating = false;
+                showingResults = false;
+                
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                
+                // Reset to negotiation phase
+                document.getElementById('contribution-phase').classList.add('hidden');
+                document.getElementById('negotiation-phase').classList.remove('hidden');
+                
+                // Reset negotiated displays
+                document.getElementById('my-negotiated').textContent = '--';
+                document.getElementById('opponent-negotiated').textContent = '--';
+                
+                // Reset dropdowns
+                document.getElementById('negotiated-contribution').value = '0';
+                document.getElementById('actual-contribution').value = '0';
+            }
+            
             document.getElementById('my-budget').textContent = gameState.budget;
             
             // Update opponent budget display
