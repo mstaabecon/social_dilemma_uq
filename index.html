@@ -797,26 +797,22 @@
             
             const resultsHTML = `
                 <div class="result-line">
-                    <span>Your negotiated:</span>
-                    <span>${myData.negotiated}</span>
+                    <span>Your contribution (negotiated):</span>
+                    <span>${myData.actual} (${myData.negotiated})</span>
                 </div>
                 <div class="result-line">
-                    <span>Your actual:</span>
-                    <span>${myData.actual}</span>
-                </div>
-                <div class="result-line">
-                    <span>${opponentName} negotiated:</span>
-                    <span>${opponentData.negotiated}</span>
-                </div>
-                <div class="result-line">
-                    <span>${opponentName} actual:</span>
-                    <span>${opponentData.actual}</span>
+                    <span>${opponentName} contribution (negotiated):</span>
+                    <span>${opponentData.actual} (${opponentData.negotiated})</span>
                 </div>
                 <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
                     <span>Public good return:</span>
                     <span>${Math.round(publicGoodReturn)}</span>
                 </div>
                 <div class="result-line">
+                    <span>Leftover budget:</span>
+                    <span>${gameState.budget - myData.actual}</span>
+                </div>
+                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
                     <span><strong>Your new budget:</strong></span>
                     <span><strong>${gameState.budget}</strong></span>
                 </div>
