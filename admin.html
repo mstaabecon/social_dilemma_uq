@@ -300,10 +300,10 @@
         
         <!-- Round Info -->
         <div class="round-info">
-            <h2>Round <span id="current-round">1</span> - Phase: <span id="current-phase">Playing</span></h2>
+            <h2>Round <span id="current-round">1</span> - Status: <span id="round-status">Live</span></h2>
             <div class="table-summary">
                 <span id="active-tables">0</span> active tables, 
-                <span id="waiting-tables">0</span> waiting for processing,
+                <span id="completed-tables">0</span> completed this round,
                 <span id="total-teams">0</span> teams playing
             </div>
         </div>
@@ -331,11 +331,11 @@
         <!-- Admin Actions -->
         <div class="admin-actions">
             <div class="controlled-only">
-                <button class="button button-primary" onclick="processAllResults()" id="process-btn">
-                    Process All Results (0)
+                <button class="button button-primary" onclick="showAllResults()" id="show-results-btn">
+                    Show All Results
                 </button>
                 <button class="button button-secondary" onclick="startNextRound()" id="next-round-btn">
-                    Start Next Round
+                    Process Results & Start Next Round
                 </button>
             </div>
             <button class="button button-warning" onclick="resetAllTables()" id="reset-btn">
@@ -387,7 +387,7 @@
         let adminState = {
             controlMode: 'free',
             currentRound: 1,
-            currentPhase: 'playing', // 'playing', 'results', 'waiting'
+            roundLive: true, // New: indicates if teams can play this round
             allowNewRounds: true,
             processingResults: false,
             forceTableReset: false
@@ -450,57 +450,38 @@
             // Update body class for conditional styling
             document.body.className = adminState.controlMode === 'controlled' ? 'controlled-mode' : '';
             
-            // Update round and phase display
+            // Update round and status display
             document.getElementById('current-round').textContent = adminState.currentRound || 1;
-            document.getElementById('current-phase').textContent = getPhaseDisplayName(adminState.currentPhase || 'playing');
+            document.getElementById('round-status').textContent = adminState.roundLive ? 'Live' : 'Results Shown';
             
-            // Update button states based on phase
-            const processBtn = document.getElementById('process-btn');
+            // Update button states
+            const showResultsBtn = document.getElementById('show-results-btn');
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                // Count tables that are ready for processing - use fresh count each time
-                const readyTables = Object.values(tables).filter(table => 
-                    table.roundData && table.roundData.teamA && table.roundData.teamB && !table.resultsProcessed
+                // Count completed tables (have round data but results not shown yet)
+                const completedTables = Object.values(tables).filter(table => 
+                    table.roundData && table.roundData.teamA && table.roundData.teamB && adminState.roundLive
                 );
-                const waitingCount = readyTables.length;
-                const currentPhase = adminState.currentPhase || 'playing';
+                const completedCount = completedTables.length;
                 
-                if (currentPhase === 'playing') {
-                    processBtn.textContent = `Process All Results (${waitingCount})`;
-                    processBtn.disabled = false;
-                    processBtn.style.opacity = '1';
-                    processBtn.style.backgroundColor = '#27ae60';
+                if (adminState.roundLive) {
+                    // Round is live - teams can play, results are hidden
+                    showResultsBtn.textContent = `Show All Results (${completedCount} completed)`;
+                    showResultsBtn.disabled = completedCount === 0;
+                    nextRoundBtn.textContent = 'Process Results & Start Next Round';
+                } else {
+                    // Results have been shown
+                    showResultsBtn.textContent = 'All Results Shown';
+                    showResultsBtn.disabled = true;
+                    showResultsBtn.style.opacity = '0.5';
                     nextRoundBtn.textContent = 'Start Next Round';
-                    nextRoundBtn.disabled = true;
-                    nextRoundBtn.style.opacity = '0.5';
-                } else if (currentPhase === 'results') {
-                    // In results phase, always check for new tables
-                    if (waitingCount > 0) {
-                        processBtn.textContent = `Process New Results (${waitingCount})`;
-                        processBtn.disabled = false;
-                        processBtn.style.opacity = '1';
-                        processBtn.style.backgroundColor = '#27ae60';
-                    } else {
-                        processBtn.textContent = 'All Results Processed';
-                        processBtn.disabled = true;
-                        processBtn.style.opacity = '0.5';
-                        processBtn.style.backgroundColor = '#666';
-                    }
-                    nextRoundBtn.textContent = 'Start Next Round';
-                    nextRoundBtn.disabled = false;
-                    nextRoundBtn.style.opacity = '1';
                 }
             }
         }
 
-        function getPhaseDisplayName(phase) {
-            switch(phase) {
-                case 'playing': return 'Playing';
-                case 'results': return 'Results';
-                case 'waiting': return 'Waiting';
-                default: return 'Playing';
-            }
+        function getRoundStatusName(roundLive) {
+            return roundLive ? 'Live' : 'Results Shown';
         }
 
         function updateTablesDisplay() {
@@ -569,7 +550,9 @@
             const completedRounds = Object.values(teams).reduce((sum, team) => sum + (team.totalRounds || 0), 0);
             const avgBudget = totalTeams > 0 ? 
                 Math.round(Object.values(teams).reduce((sum, team) => sum + (team.budget || 500), 0) / totalTeams) : 500;
-            const waitingTables = Object.values(tables).filter(table => table.waitingForAdmin).length;
+            const completedTables = Object.values(tables).filter(table => 
+                table.roundData && table.roundData.teamA && table.roundData.teamB
+            ).length;
             
             document.getElementById('stat-active-tables').textContent = activeTables;
             document.getElementById('stat-total-teams').textContent = totalTeams;
@@ -577,7 +560,7 @@
             document.getElementById('stat-avg-budget').textContent = avgBudget;
             
             document.getElementById('active-tables').textContent = activeTables;
-            document.getElementById('waiting-tables').textContent = waitingTables;
+            document.getElementById('completed-tables').textContent = completedTables;
             document.getElementById('total-teams').textContent = totalTeams;
         }
 
@@ -586,16 +569,12 @@
                 return { type: 'incomplete', icon: '👥', text: 'Waiting for Teams' };
             }
             
-            if (tableData.waitingForAdmin && !tableData.resultsProcessed) {
-                return { type: 'ready', icon: '✅', text: 'Results Ready' };
-            }
-            
-            if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB && !tableData.resultsProcessed) {
-                return { type: 'ready', icon: '✅', text: 'Ready for Processing' };
-            }
-            
-            if (tableData.resultsProcessed) {
-                return { type: 'ready', icon: '📊', text: 'Results Processed' };
+            if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
+                if (adminState.roundLive) {
+                    return { type: 'ready', icon: '✅', text: 'Round Complete (Results Hidden)' };
+                } else {
+                    return { type: 'ready', icon: '📊', text: 'Results Shown' };
+                }
             }
             
             if (tableData.roundData && (tableData.roundData.teamA || tableData.roundData.teamB)) {
@@ -625,7 +604,7 @@
             try {
                 const updates = {
                     'admin/controlMode': selectedMode,
-                    'admin/currentPhase': 'playing'
+                    'admin/roundLive': true
                 };
                 
                 if (selectedMode === 'free') {
@@ -639,17 +618,16 @@
             }
         }
 
-        async function processAllResults() {
+        async function showAllResults() {
             try {
                 const updates = {};
                 let processedCount = 0;
                 
+                // Process all completed tables
                 for (let tableCode in tables) {
                     const tableData = tables[tableCode];
                     
-                    // Process tables that have both teams submitted and haven't been processed yet
-                    if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB && !tableData.resultsProcessed) {
-                        
+                    if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
                         // Calculate results
                         const dataA = tableData.roundData.teamA;
                         const dataB = tableData.roundData.teamB;
@@ -662,8 +640,6 @@
                         // Update budgets
                         updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
                         updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
-                        updates[`tables/${tableCode}/resultsProcessed`] = true;
-                        updates[`tables/${tableCode}/waitingForAdmin`] = false;
                         
                         // Update team records
                         updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
@@ -679,59 +655,89 @@
                     }
                 }
                 
+                // Mark round as no longer live (results are now shown)
+                updates['admin/roundLive'] = false;
+                updates['admin/allowNewRounds'] = false;
+                
+                await database.ref().update(updates);
+                
                 if (processedCount > 0) {
-                    // Don't change phase if we're already in results - just process the new tables
-                    if (adminState.currentPhase !== 'results') {
-                        updates['admin/currentPhase'] = 'results';
-                        updates['admin/allowNewRounds'] = false; // Don't allow next round until admin clicks
-                    }
-                    
-                    await database.ref().update(updates);
-                    
-                    const phaseMessage = adminState.currentPhase === 'results' ? 
-                        `Processed ${processedCount} additional rounds!` : 
-                        `Processed ${processedCount} rounds! Students can now see results. Click "Start Next Round" when ready.`;
-                    alert(phaseMessage);
-                    
-                    // Force UI update after processing
-                    setTimeout(() => {
-                        updateUI();
-                    }, 500);
-                    
+                    alert(`Results shown for ${processedCount} completed tables! Students can now see their results.`);
                 } else {
-                    alert('No completed rounds to process yet. Tables that are ready will be processed automatically as they finish.');
+                    alert('No completed tables to show results for yet.');
                 }
                 
             } catch (error) {
-                console.error('Error processing rounds:', error);
-                alert('Error processing rounds. Check console for details.');
+                console.error('Error showing results:', error);
+                alert('Error showing results. Check console for details.');
             }
         }
 
         async function startNextRound() {
-            if (!confirm('Start the next round? This will clear all current results and allow teams to play again.')) {
+            const confirmMessage = adminState.roundLive ? 
+                'This will process any remaining results and start the next round. Continue?' :
+                'Start the next round? This will clear current results and allow teams to play again.';
+                
+            if (!confirm(confirmMessage)) {
                 return;
             }
             
             try {
-                // Clear all round data but keep teams at tables
                 const updates = {};
+                let processedCount = 0;
                 
+                // If round is still live, process any remaining results first
+                if (adminState.roundLive) {
+                    for (let tableCode in tables) {
+                        const tableData = tables[tableCode];
+                        
+                        if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
+                            // Calculate results
+                            const dataA = tableData.roundData.teamA;
+                            const dataB = tableData.roundData.teamB;
+                            const totalContribution = dataA.actual + dataB.actual;
+                            const publicGoodReturn = (totalContribution * 1.5) / 2;
+                            
+                            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+                            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+                            
+                            // Update budgets
+                            updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
+                            updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                            
+                            // Update team records
+                            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+                            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+                            
+                            // Increment rounds
+                            const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
+                            const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
+                            updates[`teams/${tableData.teamA.name}/totalRounds`] = teamACurrentRounds + 1;
+                            updates[`teams/${tableData.teamB.name}/totalRounds`] = teamBCurrentRounds + 1;
+                            
+                            processedCount++;
+                        }
+                    }
+                }
+                
+                // Clear all round data but keep teams at tables
                 for (let tableCode in tables) {
                     updates[`tables/${tableCode}/roundData`] = null;
                     updates[`tables/${tableCode}/negotiations`] = null;
-                    updates[`tables/${tableCode}/waitingForAdmin`] = false;
-                    updates[`tables/${tableCode}/resultsProcessed`] = false;
                 }
                 
-                // Update admin state
+                // Update admin state for new round
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
-                updates['admin/currentPhase'] = 'playing';
+                updates['admin/roundLive'] = true;
                 updates['admin/allowNewRounds'] = true;
                 
                 await database.ref().update(updates);
                 
-                alert(`Round ${adminState.currentRound + 1} started! Teams can now negotiate and play.`);
+                const message = processedCount > 0 ? 
+                    `Processed ${processedCount} remaining results and started Round ${adminState.currentRound + 1}!` :
+                    `Round ${adminState.currentRound + 1} started! Teams can now negotiate and play.`;
+                    
+                alert(message);
                 
             } catch (error) {
                 console.error('Error starting next round:', error);
@@ -799,7 +805,7 @@
 
         // Make functions globally accessible
         window.changeControlMode = changeControlMode;
-        window.processAllResults = processAllResults;
+        window.showAllResults = showAllResults;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
         window.exportData = exportData;
