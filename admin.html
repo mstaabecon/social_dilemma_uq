@@ -763,9 +763,22 @@
             }
         }
 
+        // Simple admin access check
+        function checkAdminAccess() {
+            const password = prompt("Enter admin password:");
+            if (password !== "admin123") {
+                alert("Access denied");
+                window.location.href = "index.html";
+                return false;
+            }
+            return true;
+        }
+
         // Initialize when page loads
         window.addEventListener('load', () => {
-            initializeAdmin();
+            if (checkAdminAccess()) {
+                initializeAdmin();
+            }
         });
 
         // Make functions globally accessible

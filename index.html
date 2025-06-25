@@ -456,7 +456,7 @@
                 // Always show waiting message and hide next round button in controlled mode
                 // Students can only advance when admin starts next round (which auto-resets them)
                 adminWaiting.classList.remove('hidden');
-                adminMessage.textContent = 'Waiting for instructor to start the next round...';
+                adminMessage.textContent = 'Waiting for instructor to start the next round';
                 
                 // Always hide next round button in controlled mode
                 if (nextRoundBtn) {
@@ -645,7 +645,7 @@
                             // Admin hasn't enabled results yet - show waiting message
                             document.getElementById('game-controls').classList.add('hidden');
                             document.getElementById('admin-waiting').classList.remove('hidden');
-                            document.getElementById('admin-message').textContent = 'Waiting for instructor to show results...';
+                            document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
                         }
                     } else {
                         // Free mode - calculate results immediately
