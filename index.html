@@ -215,10 +215,6 @@
                 Table: <strong><span id="display-table-code"></span></strong>
             </div>
             
-            <div class="budget-display">
-                Budget: $<span id="current-budget">500</span>
-            </div>
-            
             <div id="waiting-for-opponent" class="status hidden">
                 Waiting for opponent team to join...<br>
                 <small style="color: rgba(255,255,255,0.8);">Wrong table? Use the button below to try again</small><br>
@@ -226,62 +222,78 @@
             </div>
             
             <div id="game-controls" class="hidden">
+                <!-- Budget Comparison (single, compact) -->
                 <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="text-align: center; flex: 1;">
                             <div style="font-size: 14px; opacity: 0.8;">Your Budget</div>
-                            <div style="font-size: 20px; font-weight: bold;">$<span id="my-budget">500</span></div>
+                            <div style="font-size: 20px; font-weight: bold;"><span id="my-budget">500</span></div>
                         </div>
                         <div style="font-size: 24px; opacity: 0.6;">vs</div>
                         <div style="text-align: center; flex: 1;">
                             <div style="font-size: 14px; opacity: 0.8;">Opponent Budget</div>
-                            <div style="font-size: 20px; font-weight: bold;">$<span id="opponent-budget">500</span></div>
+                            <div style="font-size: 20px; font-weight: bold;"><span id="opponent-budget">500</span></div>
                         </div>
                     </div>
                 </div>
 
-                <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                    <h4 style="text-align: center; margin-bottom: 15px;">📢 Public Negotiated Contributions</h4>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 14px; opacity: 0.8;">You Negotiated</div>
-                            <div style="font-size: 18px; font-weight: bold; color: #4CAF50;">$<span id="my-negotiated">--</span></div>
+                <!-- Phase 1: Negotiation -->
+                <div id="negotiation-phase">
+                    <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="text-align: center; flex: 1;">
+                                <div style="font-size: 14px; opacity: 0.8;">You Negotiate</div>
+                                <div style="font-size: 18px; font-weight: bold; color: #4CAF50;"><span id="my-negotiated">--</span></div>
+                            </div>
+                            <div style="font-size: 16px; opacity: 0.6;">🤝</div>
+                            <div style="text-align: center; flex: 1;">
+                                <div style="font-size: 14px; opacity: 0.8;">Opponent Negotiates</div>
+                                <div style="font-size: 18px; font-weight: bold; color: #4CAF50;"><span id="opponent-negotiated">--</span></div>
+                            </div>
                         </div>
-                        <div style="font-size: 20px; opacity: 0.6;">🤝</div>
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 14px; opacity: 0.8;">Opponent Negotiated</div>
-                            <div style="font-size: 18px; font-weight: bold; color: #4CAF50;">$<span id="opponent-negotiated">--</span></div>
+                        
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label for="negotiated-contribution">Your Negotiated Contribution (visible to opponent)</label>
+                            <select id="negotiated-contribution" onchange="updateNegotiatedContribution()">
+                                <option value="0">0</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="300">300</option>
+                                <option value="400">400</option>
+                                <option value="500">500</option>
+                            </select>
                         </div>
+                        
+                        <button class="button button-primary" onclick="finalizeNegotiation()" id="finalize-button">
+                            Finalize Negotiation
+                        </button>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="negotiated-contribution">📢 Your Negotiated Contribution (visible to opponent)</label>
-                    <select id="negotiated-contribution" onchange="updateNegotiatedContribution()">
-                        <option value="0">$0</option>
-                        <option value="100">$100</option>
-                        <option value="200">$200</option>
-                        <option value="300">$300</option>
-                        <option value="400">$400</option>
-                        <option value="500">$500</option>
-                    </select>
-                </div>
 
-                <div class="form-group">
-                    <label for="actual-contribution">🔒 Your Actual Contribution (secret until both submit)</label>
-                    <select id="actual-contribution">
-                        <option value="0">$0</option>
-                        <option value="100">$100</option>
-                        <option value="200">$200</option>
-                        <option value="300">$300</option>
-                        <option value="400">$400</option>
-                        <option value="500">$500</option>
-                    </select>
+                <!-- Phase 2: Actual Contribution -->
+                <div id="contribution-phase" class="hidden">
+                    <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                        <p style="text-align: center; margin-bottom: 15px; opacity: 0.9;">
+                            You negotiated: <strong><span id="negotiated-display">0</span></strong>
+                        </p>
+                        
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label for="actual-contribution">Your Actual Contribution (secret until both submit)</label>
+                            <select id="actual-contribution">
+                                <option value="0">0</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="300">300</option>
+                                <option value="400">400</option>
+                                <option value="500">500</option>
+                            </select>
+                        </div>
+                        
+                        <button class="button button-primary" onclick="submitRound()" id="submit-button">
+                            Submit Round
+                        </button>
+                    </div>
                 </div>
-                
-                <button class="button button-primary" onclick="submitRound()" id="submit-button">
-                    Submit Round
-                </button>
             </div>
             
             <div id="waiting-for-round" class="status hidden">
@@ -501,6 +513,19 @@
                 document.getElementById('game-controls').classList.add('hidden');
             }
         }
+    
+
+        function finalizeNegotiation() {
+            const negotiatedAmount = document.getElementById('negotiated-contribution').value;
+            
+            // Update the display and set default for actual contribution
+            document.getElementById('negotiated-display').textContent = negotiatedAmount;
+            document.getElementById('actual-contribution').value = negotiatedAmount;
+            
+            // Switch phases
+            document.getElementById('negotiation-phase').classList.add('hidden');
+            document.getElementById('contribution-phase').classList.remove('hidden');
+        }
 
         async function updateNegotiatedContribution() {
             const negotiatedAmount = document.getElementById('negotiated-contribution').value;
@@ -520,7 +545,6 @@
                 console.error('Error updating negotiated contribution:', error);
             }
         }
-
 
         async function submitRound() {
             const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
@@ -653,6 +677,10 @@
                 document.getElementById('round-results').classList.add('hidden');
                 document.getElementById('game-controls').classList.remove('hidden');
                 
+                // Reset to negotiation phase
+                document.getElementById('contribution-phase').classList.add('hidden');
+                document.getElementById('negotiation-phase').classList.remove('hidden');
+                
                 // Reset negotiated displays
                 document.getElementById('my-negotiated').textContent = '--';
                 document.getElementById('opponent-negotiated').textContent = '--';
@@ -743,6 +771,7 @@
         window.changeTable = changeTable;
         window.cancelWaiting = cancelWaiting;
         window.updateNegotiatedContribution = updateNegotiatedContribution;
+        window.finalizeNegotiation = finalizeNegotiation;
     </script>
 </body>
 </html>
