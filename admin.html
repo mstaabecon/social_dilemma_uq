@@ -459,7 +459,12 @@
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                const waitingCount = Object.values(tables).filter(table => table.waitingForAdmin).length;
+                // Count tables that are ready for processing (either waitingForAdmin OR both teams submitted)
+                const readyTables = Object.values(tables).filter(table => 
+                    (table.waitingForAdmin && !table.resultsProcessed) ||
+                    (table.roundData && table.roundData.teamA && table.roundData.teamB && !table.resultsProcessed)
+                );
+                const waitingCount = readyTables.length;
                 const currentPhase = adminState.currentPhase || 'playing';
                 
                 if (currentPhase === 'playing') {
@@ -575,8 +580,12 @@
                 return { type: 'ready', icon: '✅', text: 'Results Ready' };
             }
             
-            if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
-                return { type: 'ready', icon: '⏸️', text: 'Round Complete' };
+            if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB && !tableData.resultsProcessed) {
+                return { type: 'ready', icon: '✅', text: 'Ready for Processing' };
+            }
+            
+            if (tableData.resultsProcessed) {
+                return { type: 'ready', icon: '📊', text: 'Results Processed' };
             }
             
             if (tableData.roundData && (tableData.roundData.teamA || tableData.roundData.teamB)) {
@@ -628,8 +637,8 @@
                 for (let tableCode in tables) {
                     const tableData = tables[tableCode];
                     
-                    if (tableData.waitingForAdmin && !tableData.resultsProcessed && 
-                        tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
+                    // Process tables that have both teams submitted and haven't been processed yet
+                    if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB && !tableData.resultsProcessed) {
                         
                         // Calculate results
                         const dataA = tableData.roundData.teamA;
