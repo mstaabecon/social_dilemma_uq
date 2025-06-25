@@ -620,22 +620,26 @@
                     // I've submitted, waiting for opponent
                     document.getElementById('game-controls').classList.add('hidden');
                     document.getElementById('waiting-for-round').classList.remove('hidden');
+                    document.getElementById('admin-waiting').classList.add('hidden');
                 } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
                     // Both teams have submitted - check what to do based on admin control
+                    document.getElementById('waiting-for-round').classList.add('hidden'); // Hide opponent waiting message
+                    
                     if (adminState.controlMode === 'controlled') {
                         if (adminState.showResults) {
                             // Admin has enabled results display - show results immediately
+                            document.getElementById('admin-waiting').classList.add('hidden');
                             isCalculating = true;
                             calculateResults(tableData);
                         } else {
                             // Admin hasn't enabled results yet - show waiting message
                             document.getElementById('game-controls').classList.add('hidden');
-                            document.getElementById('waiting-for-round').classList.add('hidden');
                             document.getElementById('admin-waiting').classList.remove('hidden');
                             document.getElementById('admin-message').textContent = 'Waiting for instructor to show results...';
                         }
                     } else {
                         // Free mode - calculate results immediately
+                        document.getElementById('admin-waiting').classList.add('hidden');
                         isCalculating = true;
                         calculateResults(tableData);
                     }
