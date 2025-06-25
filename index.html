@@ -790,7 +790,7 @@
             }
         }
 
-        function showResults(dataA, dataB, publicGoodReturn, tableData, originalBudget) {
+        function showResults(dataA, dataB, publicGoodReturn, tableData) {
             const myData = gameState.isTeamA ? dataA : dataB;
             const opponentData = gameState.isTeamA ? dataB : dataA;
             const opponentName = gameState.isTeamA ? tableData.teamB.name : tableData.teamA.name;
@@ -810,7 +810,7 @@
                 </div>
                 <div class="result-line">
                     <span>Leftover budget:</span>
-                    <span>${originalBudget - myData.actual}</span>
+                    <span>${gameState.budget - Math.round(publicGoodReturn)}</span>
                 </div>
                 <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
                     <span><strong>Your new budget:</strong></span>
