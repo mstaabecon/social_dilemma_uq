@@ -224,6 +224,14 @@
                 </small>
             </div>
             
+            <!-- Shared Device Toggle (only visible when admin enables shared device mode) -->
+            <div class="form-group" id="shared-device-option" style="display: none;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="is-shared-device" style="transform: scale(1.3);">
+                    This is a shared device (two teams using one device)
+                </label>
+            </div>
+            
             <button class="button button-primary" onclick="joinTable()">Join Table</button>
         </div>
         
@@ -418,6 +426,14 @@
                 return;
             }
 
+            // Show/hide shared device option based on admin setting
+            const sharedDeviceOption = document.getElementById('shared-device-option');
+            if (adminState.sharedDevices) {
+                sharedDeviceOption.style.display = 'block';
+            } else {
+                sharedDeviceOption.style.display = 'none';
+            }
+
             // Handle centrally controlled mode
             if (adminState.controlMode === 'controlled') {
                 handleControlledMode();
@@ -486,6 +502,7 @@
         async function joinTable() {
             const teamName = document.getElementById('team-name').value.trim();
             const tableCode = document.getElementById('table-code').value.trim().toUpperCase();
+            const isSharedDevice = document.getElementById('is-shared-device').checked;
             
             if (!teamName || !tableCode) {
                 showError('Please enter both team name and table code');
@@ -511,6 +528,11 @@
                     roundData: {},
                     status: 'waiting'
                 };
+                
+                // Set shared device flag if this is the first team to join
+                if (!tableData.teamA && !tableData.teamB) {
+                    tableData.isSharedDevice = isSharedDevice;
+                }
                 
                 // Get team's existing budget
                 const teamRef = database.ref(`teams/${teamName}`);
