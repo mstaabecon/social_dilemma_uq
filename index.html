@@ -791,31 +791,49 @@
         }
 
         function showResults(dataA, dataB, publicGoodReturn, tableData) {
-            const myData = gameState.isTeamA ? dataA : dataB;
-            const opponentData = gameState.isTeamA ? dataB : dataA;
-            const opponentName = gameState.isTeamA ? tableData.teamB.name : tableData.teamA.name;
+            const team1Name = tableData.teamA.name;
+            const team2Name = tableData.teamB.name;
+            const team1Budget = Math.round((tableData.teamA.budget - dataA.actual) + publicGoodReturn);
+            const team2Budget = Math.round((tableData.teamB.budget - dataB.actual) + publicGoodReturn);
+            const team1Leftover = tableData.teamA.budget - dataA.actual;
+            const team2Leftover = tableData.teamB.budget - dataB.actual;
             
             const resultsHTML = `
-                <div class="result-line">
-                    <span>Your contribution (negotiated):</span>
-                    <span>${myData.actual} (${myData.negotiated})</span>
-                </div>
-                <div class="result-line">
-                    <span>${opponentName} contribution (negotiated):</span>
-                    <span>${opponentData.actual} (${opponentData.negotiated})</span>
-                </div>
-                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
-                    <span>Public good return:</span>
-                    <span>${Math.round(publicGoodReturn)}</span>
-                </div>
-                <div class="result-line">
-                    <span>Leftover budget:</span>
-                    <span>${gameState.budget - Math.round(publicGoodReturn)}</span>
-                </div>
-                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
-                    <span><strong>Your new budget:</strong></span>
-                    <span><strong>${gameState.budget}</strong></span>
-                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3);"></th>
+                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${team1Name}</th>
+                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${team2Name}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Negotiated Contribution</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataA.negotiated}</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataB.negotiated}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Actual Contribution</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataA.actual}</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataB.actual}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Public Good Return (each)</td>
+                            <td colspan="2" style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${Math.round(publicGoodReturn)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Leftover Budget</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${team1Leftover}</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${team2Leftover}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold;">New Budget</td>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${team1Budget}</td>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${team2Budget}</td>
+                        </tr>
+                    </tbody>
+                </table>
             `;
             
             document.getElementById('results-content').innerHTML = resultsHTML;
@@ -836,12 +854,6 @@
         async function nextRound() {
             try {
                 // Clear round data for this table but keep teams
-                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
-                
-                // Clear negotiation data 
-                await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
-                
-                // Clear admin flags - no longer needed with simplified logic
                 await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
                 
                 // Clear negotiation data 
@@ -949,4 +961,3 @@
     </script>
 </body>
 </html>
-                
