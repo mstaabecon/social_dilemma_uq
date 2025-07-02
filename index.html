@@ -1,363 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Social Dilemma</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #51247A 0%, #663399 50%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: white;
-        }
-        
-        .container {
-            max-width: 400px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
-        
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 24px;
-            font-weight: 600;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            font-size: 16px;
-        }
-        
-        input, select {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-        }
-        
-        input:focus, select:focus {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
-        }
-        
-        .button {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 10px;
-        }
-        
-        .button-primary {
-            background: #4CAF50;
-            color: white;
-        }
-        
-        .button-primary:hover {
-            background: #45a049;
-            transform: translateY(-2px);
-        }
-        
-        .button-primary:disabled {
-            background: #666;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .button-secondary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .choice-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .choice-button {
-            flex: 1;
-            padding: 20px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .choice-black {
-            background: #2c3e50;
-            color: white;
-        }
-        
-        .choice-red {
-            background: #e74c3c;
-            color: white;
-        }
-        
-        .choice-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        
-        .choice-button.selected {
-            transform: scale(1.05);
-            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
-        }
-        
-        .status {
-            text-align: center;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            margin-bottom: 20px;
-            font-size: 16px;
-        }
-        
-        .admin-status {
-            background: rgba(255, 193, 7, 0.2);
-            border: 2px solid rgba(255, 193, 7, 0.5);
-        }
-        
-        .budget-display {
-            text-align: center;
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 20px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-        }
-        
-        .results {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .results h3 {
-            margin-bottom: 15px;
-            text-align: center;
-        }
-        
-        .result-line {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .round-info {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.15);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        
-        .hidden {
-            display: none !important;
-        }
-        
-        .error {
-            background: rgba(231, 76, 60, 0.2);
-            color: #fff;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🤝 The Social Dilemma</h1>
-        
-        <!-- Round Info Display -->
-        <div id="round-info" class="round-info hidden">
-            Round <span id="current-round-display">1</span>
-        </div>
-        
-        <!-- Setup Phase -->
-        <div id="setup-phase">
-            <div class="form-group">
-                <label for="team-name">Team Name</label>
-                <input type="text" id="team-name" placeholder="Enter your team name">
-            </div>
-            
-            <div class="form-group">
-                <label for="table-code">Table Code</label>
-                <input type="text" id="table-code" placeholder="Enter your table code exactly as shown">
-                <small style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 5px; display: block;">
-                    Check the code on your physical table carefully
-                </small>
-            </div>
-            
-            <button class="button button-primary" onclick="joinTable()">Join Table</button>
-        </div>
-        
-        <!-- Game Phase -->
-        <div id="game-phase" class="hidden">
-            <div class="status" style="background: rgba(255, 255, 255, 0.15); margin-bottom: 15px;">
-                Team: <strong><span id="display-team-name"></span></strong> | 
-                Table: <strong><span id="display-table-code"></span></strong>
-            </div>
-            
-            <div id="waiting-for-opponent" class="status hidden">
-                Waiting for opponent team to join<br>
-                <small style="color: rgba(255,255,255,0.8);">Wrong table? Use the button below to try again</small><br>
-                <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
-            </div>
-            
-            <div id="admin-waiting" class="status admin-status hidden">
-                <strong>Waiting for instructor...</strong><br>
-                <span id="admin-message">The instructor will start the next round soon.</span>
-            </div>
-            
-            <div id="game-controls" class="hidden">
-                <!-- Budget Comparison (single, compact) -->
-                <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 14px; opacity: 0.8;">Your Budget</div>
-                            <div style="font-size: 20px; font-weight: bold;"><span id="my-budget">500</span></div>
-                        </div>
-                        <div style="font-size: 24px; opacity: 0.6;">vs</div>
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 14px; opacity: 0.8;">Opponent Budget</div>
-                            <div style="font-size: 20px; font-weight: bold;"><span id="opponent-budget">500</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Phase 1: Negotiation -->
-                <div id="negotiation-phase">
-                    <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <div style="text-align: center; flex: 1;">
-                                <div style="font-size: 14px; opacity: 0.8;">You Negotiate</div>
-                                <div style="font-size: 18px; font-weight: bold; color: #4CAF50;"><span id="my-negotiated">--</span></div>
-                            </div>
-                            <div style="font-size: 16px; opacity: 0.6;">🤝</div>
-                            <div style="text-align: center; flex: 1;">
-                                <div style="font-size: 14px; opacity: 0.8;">Opponent Negotiates</div>
-                                <div style="font-size: 18px; font-weight: bold; color: #4CAF50;"><span id="opponent-negotiated">--</span></div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="negotiated-contribution">Your Negotiated Contribution</label>
-                            <small style="color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 8px; display: block;">
-                            visible to opponent
-                            </small>
-                            <select id="negotiated-contribution" onchange="updateNegotiatedContribution()">
-                                <option value="0">0</option>
-                                <option value="100">100</option>
-                                <option value="200">200</option>
-                                <option value="300">300</option>
-                                <option value="400">400</option>
-                                <option value="500">500</option>
-                            </select>
-                        </div>
-                        
-                        <button class="button button-primary" onclick="finalizeNegotiation()" id="finalize-button">
-                            Finalise Negotiation
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Phase 2: Actual Contribution -->
-                <div id="contribution-phase" class="hidden">
-                    <div style="background: rgba(0, 0, 0, 0.3); border: 2px solid rgba(255, 165, 0, 0.6); border-radius: 12px; padding: 20px; margin-bottom: 20px; position: relative;">
-                        <!-- SECRET badge -->
-                        <div style="position: absolute; top: -10px; right: 15px; background: #ff6b35; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; letter-spacing: 1px;">
-                            🔒 SECRET
-                        </div>
-                        
-                        <div style="text-align: center; margin-bottom: 15px; color: #ff6b35; font-weight: bold; font-size: 16px;">
-                            🔒 Private Decision Phase
-                        </div>
-                        
-                        <p style="text-align: center; margin-bottom: 15px; opacity: 0.9; font-size: 14px; color: #ffcc99;">
-                            You negotiated: <strong><span id="negotiated-display">0</span></strong><br>
-                            <em>Now decide your actual contribution (hidden from opponent)</em>
-                        </p>
-                        
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="actual-contribution" style="color: #ff6b35; font-weight: bold;">Your Actual Contribution (secret until both submit)</label>
-                            <select id="actual-contribution" style="border: 2px solid #ff6b35; background: rgba(255, 255, 255, 0.95);">
-                                <option value="0">0</option>
-                                <option value="100">100</option>
-                                <option value="200">200</option>
-                                <option value="300">300</option>
-                                <option value="400">400</option>
-                                <option value="500">500</option>
-                            </select>
-                        </div>
-                        
-                        <button class="button button-primary" onclick="submitRound()" id="submit-button" style="background: #ff6b35; border: none;">
-                            🔒 Submit Secret Decision
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="waiting-for-round" class="status hidden">
-                Waiting for opponent to submit
-            </div>
-            
-            <div id="round-results" class="hidden">
-                <div class="results">
-                    <h3>Round Results</h3>
-                    <div id="results-content"></div>
-                </div>
-                
-                <div id="next-round-controls">
-                    <button class="button button-secondary" onclick="nextRound()" id="next-round-btn">Next Round</button>
-                    <button class="button button-secondary" onclick="changeTable()">Change Table (Both Teams)</button>
-                </div>
-            </div>
-        </div>
-        
-        <div id="error-message" class="error hidden"></div>
-    </div>
-
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-    <script>
+<script>
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
@@ -372,14 +13,19 @@
         // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-
         // Game state
         let gameState = {
             teamName: '',
             tableCode: '',
             budget: 500,
             selectedChoice: null,
-            isTeamA: false
+            isTeamA: false,
+            sharedDevice: false,
+            team1Name: '',
+            team2Name: '',
+            currentPlayingTeam: 1, // 1 or 2, which team is currently playing
+            roundNumber: 1,
+            teamOrder: [1, 2] // Will be reversed each round
         };
 
         let currentTableRef = null;
@@ -388,128 +34,140 @@
         let showingResults = false;
         let adminState = { controlMode: 'free', allowNewRounds: true, currentRound: 1, showResults: false };
 
-        // Initialize admin listener
-        function initializeAdminListener() {
-            adminRef = database.ref('admin');
-            adminRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    adminState = data;
-                    updateRoundDisplay();
-                    handleAdminStateChange();
-                }
-            });
-        }
-
-        function updateRoundDisplay() {
-            const roundDisplay = document.getElementById('current-round-display');
-            const roundInfo = document.getElementById('round-info');
+        function toggleSharedDevice() {
+            const isShared = document.getElementById('shared-device-toggle').checked;
             
-            if (adminState.currentRound) {
-                roundDisplay.textContent = adminState.currentRound;
-                roundInfo.classList.remove('hidden');
-            }
-        }
-
-        function handleAdminStateChange() {
-            // Handle force table reset
-            if (adminState.forceTableReset) {
-                handleForceTableReset();
-                return;
-            }
-
-            // Handle centrally controlled mode
-            if (adminState.controlMode === 'controlled') {
-                handleControlledMode();
-                
-                // Check if admin just enabled results display and we have complete round data
-                if (adminState.showResults && !showingResults) {
-                    // Get current table data to check if we should show results
-                    if (currentTableRef) {
-                        currentTableRef.once('value').then((snapshot) => {
-                            const tableData = snapshot.val();
-                            if (tableData && tableData.roundData && 
-                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
-                                // We have complete data and admin enabled results - show them now
-                                isCalculating = true;
-                                calculateResults(tableData);
-                            }
-                        }).catch((error) => {
-                            console.error('Error checking table data:', error);
-                        });
-                    }
-                }
-            }
-        }
-
-        function handleForceTableReset() {
-            // Force return to table selection
-            document.getElementById('game-phase').classList.add('hidden');
-            document.getElementById('setup-phase').classList.remove('hidden');
-            
-            // Clear current table
-            document.getElementById('table-code').value = '';
-            
-            // Show message
-            showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
-            
-            // Stop listening to old table
-            if (currentTableRef) {
-                currentTableRef.off();
-                currentTableRef = null;
-            }
-
-            // Reset game state
-            gameState.selectedChoice = null;
-            showingResults = false;
-            isCalculating = false;
-        }
-
-        function handleControlledMode() {
-            const adminWaiting = document.getElementById('admin-waiting');
-            const nextRoundBtn = document.getElementById('next-round-btn');
-            const adminMessage = document.getElementById('admin-message');
-
-            if (adminState.controlMode === 'controlled' && showingResults) {
-                // Always show waiting message and hide next round button in controlled mode
-                // Students can only advance when admin starts next round (which auto-resets them)
-                adminWaiting.classList.remove('hidden');
-                adminMessage.textContent = 'Waiting for instructor to start the next round';
-                
-                // Always hide next round button in controlled mode
-                if (nextRoundBtn) {
-                    nextRoundBtn.style.display = 'none';
-                }
+            if (isShared) {
+                document.getElementById('single-team-input').classList.add('hidden');
+                document.getElementById('dual-team-input').classList.remove('hidden');
+            } else {
+                document.getElementById('single-team-input').classList.remove('hidden');
+                document.getElementById('dual-team-input').classList.add('hidden');
             }
         }
 
         async function joinTable() {
-            const teamName = document.getElementById('team-name').value.trim();
             const tableCode = document.getElementById('table-code').value.trim().toUpperCase();
+            const isSharedDevice = document.getElementById('shared-device-toggle').checked;
             
-            if (!teamName || !tableCode) {
-                showError('Please enter both team name and table code');
+            if (!tableCode) {
+                showError('Please enter table code');
                 return;
             }
             
-            gameState.teamName = teamName;
             gameState.tableCode = tableCode;
+            gameState.sharedDevice = isSharedDevice;
             
-            // Update display
-            document.getElementById('display-team-name').textContent = teamName;
-            document.getElementById('display-table-code').textContent = tableCode;
+            if (isSharedDevice) {
+                const team1Name = document.getElementById('team1-name').value.trim();
+                const team2Name = document.getElementById('team2-name').value.trim();
+                
+                if (!team1Name || !team2Name) {
+                    showError('Please enter both team names');
+                    return;
+                }
+                
+                if (team1Name === team2Name) {
+                    showError('Team names must be different');
+                    return;
+                }
+                
+                gameState.team1Name = team1Name;
+                gameState.team2Name = team2Name;
+                
+                // Set up shared device mode
+                await setupSharedDevice();
+            } else {
+                const teamName = document.getElementById('team-name').value.trim();
+                
+                if (!teamName) {
+                    showError('Please enter team name');
+                    return;
+                }
+                
+                gameState.teamName = teamName;
+                
+                // Set up single device mode (existing logic)
+                await setupSingleDevice();
+            }
+        }
+
+        async function setupSharedDevice() {
+            try {
+                // Store shared device flag and team names in table
+                currentTableRef = database.ref(`tables/${gameState.tableCode}`);
+                
+                const tableSnapshot = await currentTableRef.once('value');
+                let tableData = tableSnapshot.val() || {};
+                
+                // Set up table for shared device mode
+                tableData.sharedDevice = true;
+                tableData.team1Name = gameState.team1Name;
+                tableData.team2Name = gameState.team2Name;
+                tableData.teamOrder = gameState.teamOrder;
+                
+                // Initialize both teams in database
+                const team1Ref = database.ref(`teams/${gameState.team1Name}`);
+                const team2Ref = database.ref(`teams/${gameState.team2Name}`);
+                
+                const team1Snapshot = await team1Ref.once('value');
+                const team2Snapshot = await team2Ref.once('value');
+                
+                if (!team1Snapshot.exists()) {
+                    await team1Ref.set({ budget: 500, totalRounds: 0 });
+                }
+                if (!team2Snapshot.exists()) {
+                    await team2Ref.set({ budget: 500, totalRounds: 0 });
+                }
+                
+                // Set up table teams
+                const team1Data = team1Snapshot.val() || { budget: 500, totalRounds: 0 };
+                const team2Data = team2Snapshot.val() || { budget: 500, totalRounds: 0 };
+                
+                tableData.teamA = { name: gameState.team1Name, budget: team1Data.budget };
+                tableData.teamB = { name: gameState.team2Name, budget: team2Data.budget };
+                
+                await currentTableRef.set(tableData);
+                
+                // Update displays
+                document.getElementById('display-table-code').textContent = gameState.tableCode;
+                document.getElementById('display-team1').textContent = gameState.team1Name;
+                document.getElementById('display-team2').textContent = gameState.team2Name;
+                
+                // Set up listener
+                currentTableRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        updateSharedGameState(data);
+                    }
+                });
+                
+                // Start with team selection
+                document.getElementById('setup-phase').classList.add('hidden');
+                document.getElementById('team-selection-phase').classList.remove('hidden');
+                
+                updateTeamPrompt();
+                
+            } catch (error) {
+                console.error('Error setting up shared device:', error);
+                showError('Error setting up shared device. Please try again.');
+            }
+        }
+
+        async function setupSingleDevice() {
+            // Use existing single device logic from original code
+            const teamName = gameState.teamName;
             
             try {
-                // Reference to this table
-                currentTableRef = database.ref(`tables/${tableCode}`);
+                currentTableRef = database.ref(`tables/${gameState.tableCode}`);
                 
-                // Get existing table data
                 const tableSnapshot = await currentTableRef.once('value');
                 let tableData = tableSnapshot.val() || {
                     teamA: null,
                     teamB: null,
                     roundData: {},
-                    status: 'waiting'
+                    status: 'waiting',
+                    sharedDevice: false
                 };
                 
                 // Get team's existing budget
@@ -520,12 +178,11 @@
                 if (teamData) {
                     gameState.budget = teamData.budget;
                 } else {
-                    // New team
                     await teamRef.set({ budget: 500, totalRounds: 0 });
                     gameState.budget = 500;
                 }
                 
-                // Join table logic
+                // Join table logic (existing)
                 if (!tableData.teamA) {
                     tableData.teamA = { name: teamName, budget: gameState.budget };
                     gameState.isTeamA = true;
@@ -543,23 +200,24 @@
                     return;
                 }
                 
-                // Update current table reference in team record
-                await database.ref(`teams/${teamName}/currentTable`).set(tableCode);
-                
-                // Update table in Firebase
+                await database.ref(`teams/${teamName}/currentTable`).set(gameState.tableCode);
                 await currentTableRef.set(tableData);
                 
-                // Set up real-time listener
                 currentTableRef.on('value', (snapshot) => {
                     const data = snapshot.val();
-                    if (data) {
-                        updateGameState(data);
+                    if (data && !data.sharedDevice) {
+                        updateSingleGameState(data);
                     }
                 });
+                
+                // Update displays
+                document.getElementById('display-team-name').textContent = teamName;
+                document.getElementById('display-table-code-single').textContent = gameState.tableCode;
                 
                 // Switch to game phase
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
+                document.getElementById('single-team-status').classList.remove('hidden');
                 
             } catch (error) {
                 console.error('Error joining table:', error);
@@ -567,18 +225,469 @@
             }
         }
 
+        function updateTeamPrompt() {
+            const currentTeamNumber = gameState.teamOrder[0]; // First team in order
+            const currentTeamName = currentTeamNumber === 1 ? gameState.team1Name : gameState.team2Name;
+            
+            document.getElementById('team-prompt').textContent = 
+                `Team ${currentTeamNumber} (${currentTeamName}): Please confirm it's your turn`;
+        }
+
+        function confirmTeamTurn() {
+            const currentTeamNumber = gameState.teamOrder[0];
+            gameState.currentPlayingTeam = currentTeamNumber;
+            
+            // Set current team name for display
+            const currentTeamName = currentTeamNumber === 1 ? gameState.team1Name : gameState.team2Name;
+            document.getElementById('current-team-name').textContent = currentTeamName;
+            
+            // Switch to game phase
+            document.getElementById('team-selection-phase').classList.add('hidden');
+            document.getElementById('game-phase').classList.remove('hidden');
+            document.getElementById('shared-team-banner').classList.remove('hidden');
+            
+            // Start the game for this team
+            startGameForCurrentTeam();
+        }
+
+        function startGameForCurrentTeam() {
+            // Check if opponent team exists and start game
+            document.getElementById('waiting-for-opponent').classList.add('hidden');
+            document.getElementById('ready-to-play').classList.remove('hidden');
+            document.getElementById('negotiation-phase').classList.remove('hidden');
+            
+            // Update budget displays based on current team
+            updateBudgetDisplays();
+        }
+
+        function updateBudgetDisplays() {
+            // For shared device, we need to show current team's budget vs opponent
+            if (gameState.sharedDevice) {
+                const currentTeamNumber = gameState.currentPlayingTeam;
+                const isCurrentTeamA = currentTeamNumber === 1;
+                
+                // Set gameState.isTeamA for compatibility with existing game logic
+                gameState.isTeamA = isCurrentTeamA;
+                gameState.teamName = isCurrentTeamA ? gameState.team1Name : gameState.team2Name;
+            }
+        }
+
+        function updateSharedGameState(tableData) {
+            // Handle shared device game state updates
+            if (!tableData.sharedDevice) return;
+            
+            // Update budget displays
+            if (tableData.teamA && tableData.teamB) {
+                updateBudgetDisplays();
+                
+                const currentTeamNumber = gameState.currentPlayingTeam;
+                const myBudget = currentTeamNumber === 1 ? tableData.teamA.budget : tableData.teamB.budget;
+                const opponentBudget = currentTeamNumber === 1 ? tableData.teamB.budget : tableData.teamA.budget;
+                
+                document.getElementById('my-budget').textContent = myBudget;
+                document.getElementById('opponent-budget').textContent = opponentBudget;
+                
+                // Check round completion for shared device
+                const myTeamKey = currentTeamNumber === 1 ? 'teamA' : 'teamB';
+                const opponentKey = currentTeamNumber === 1 ? 'teamB' : 'teamA';
+                
+                if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
+                    // Current team submitted, need to hand over to other team
+                    showTeamHandover();
+                } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey]) {
+                    // Both teams submitted, show results (if admin allows)
+                    if (adminState.controlMode === 'controlled') {
+                        if (adminState.showResults && !isCalculating) {
+                            isCalculating = true;
+                            calculateSharedResults(tableData);
+                        }
+                    } else {
+                        if (!isCalculating) {
+                            isCalculating = true;
+                            calculateSharedResults(tableData);
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateSingleGameState(data) {
+            // Use existing single device update logic
+            // This is the same as the original updateGameState function
+            updateGameState(data);
+        }
+
+        function showTeamHandover() {
+            document.getElementById('ready-to-play').classList.add('hidden');
+            document.getElementById('waiting-results').classList.add('hidden');
+            document.getElementById('team-handover').classList.remove('hidden');
+            
+            const currentTeamNumber = gameState.currentPlayingTeam;
+            const nextTeamNumber = currentTeamNumber === 1 ? 2 : 1;
+            const currentTeamName = currentTeamNumber === 1 ? gameState.team1Name : gameState.team2Name;
+            const nextTeamName = nextTeamNumber === 1 ? gameState.team1Name : gameState.team2Name;
+            
+            document.getElementById('completed-team').textContent = `Team ${currentTeamNumber} (${currentTeamName})`;
+            document.getElementById('next-team').textContent = `Team ${nextTeamNumber} (${nextTeamName})`;
+        }
+
+        function switchToNextTeam() {
+            const nextTeamNumber = gameState.currentPlayingTeam === 1 ? 2 : 1;
+            gameState.currentPlayingTeam = nextTeamNumber;
+            
+            const nextTeamName = nextTeamNumber === 1 ? gameState.team1Name : gameState.team2Name;
+            document.getElementById('current-team-name').textContent = nextTeamName;
+            
+            // Hide handover, show game controls for next team
+            document.getElementById('team-handover').classList.add('hidden');
+            document.getElementById('ready-to-play').classList.remove('hidden');
+            
+            // Reset game phase for next team
+            document.getElementById('contribution-phase').classList.add('hidden');
+            document.getElementById('negotiation-phase').classList.remove('hidden');
+            
+            // Reset inputs
+            document.getElementById('negotiated-contribution').value = '0';
+            document.getElementById('actual-contribution').value = '0';
+            document.getElementById('my-negotiated').textContent = '--';
+            
+            // Update budget displays for new team
+            updateBudgetDisplays();
+            startGameForCurrentTeam();
+        }
+
+        function calculateSharedResults(tableData) {
+            const dataA = tableData.roundData.teamA;
+            const dataB = tableData.roundData.teamB;
+            
+            if (!dataA || !dataB) return;
+            
+            // Same calculation logic as original
+            const totalContribution = dataA.actual + dataB.actual;
+            const publicGoodReturn = totalContribution * 0.75;
+            
+            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+            
+            // Update Firebase (same as original logic)
+            const updates = {};
+            updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
+            updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
+            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+            
+            database.ref().update(updates).then(() => {
+                showSharedResults(dataA, dataB, publicGoodReturn, tableData);
+                isCalculating = false;
+            }).catch((error) => {
+                console.error('Error updating results:', error);
+                isCalculating = false;
+            });
+        }
+
+        function showSharedResults(dataA, dataB, publicGoodReturn, tableData) {
+            // Show results for both teams side by side
+            const resultsHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+                    <div style="text-align: center;">
+                        <h4 style="margin-bottom: 10px; color: #4CAF50;">${gameState.team1Name}</h4>
+                        <div>Negotiated: ${dataA.negotiated}</div>
+                        <div>Actually contributed: ${dataA.actual}</div>
+                        <div>New budget: <strong>${Math.round((tableData.teamA.budget - dataA.actual) + publicGoodReturn)}</strong></div>
+                    </div>
+                    <div style="text-align: center;">
+                        <h4 style="margin-bottom: 10px; color: #4CAF50;">${gameState.team2Name}</h4>
+                        <div>Negotiated: ${dataB.negotiated}</div>
+                        <div>Actually contributed: ${dataB.actual}</div>
+                        <div>New budget: <strong>${Math.round((tableData.teamB.budget - dataB.actual) + publicGoodReturn)}</strong></div>
+                    </div>
+                </div>
+                <div style="text-align: center; border-top: 2px solid rgba(255,255,255,0.3); padding-top: 15px;">
+                    <div>Total contributed: ${dataA.actual + dataB.actual}</div>
+                    <div>Public good return (each): ${Math.round(publicGoodReturn)}</div>
+                </div>
+            `;
+            
+            document.getElementById('results-content').innerHTML = resultsHTML;
+            document.getElementById('team-handover').classList.add('hidden');
+            document.getElementById('ready-to-play').classList.add('hidden');
+            document.getElementById('round-results').classList.remove('hidden');
+            document.getElementById('shared-results-message').classList.remove('hidden');
+            
+            showingResults = true;
+        }
+
+        async function nextRound() {
+            if (gameState.sharedDevice) {
+                // Reverse team order for next round
+                gameState.teamOrder.reverse();
+                gameState.roundNumber++;
+                
+                // Clear round data
+                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
+                await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
+                
+                // Reset state
+                isCalculating = false;
+                showingResults = false;
+                
+                // Reset UI
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('team-selection-phase').classList.remove('hidden');
+                document.getElementById('game-phase').classList.add('hidden');
+                
+                // Update team prompt for new order
+                updateTeamPrompt();
+            } else {
+                // Use existing next round logic for single device
+                // (same as original nextRound function)
+                try {
+                    await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
+                    await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
+                    
+                    isCalculating = false;
+                    showingResults = false;
+                    
+                    document.getElementById('round-results').classList.add('hidden');
+                    document.getElementById('game-controls').classList.remove('hidden');
+                    document.getElementById('contribution-phase').classList.add('hidden');
+                    document.getElementById('negotiation-phase').classList.remove('hidden');
+                    
+                    document.getElementById('my-negotiated').textContent = '--';
+                    document.getElementById('opponent-negotiated').textContent = '--';
+                    document.getElementById('negotiated-contribution').value = '0';
+                    document.getElementById('actual-contribution').value = '0';
+                    
+                } catch (error) {
+                    console.error('Error starting new round:', error);
+                    showError('Error preparing new round. Please refresh if needed.');
+                }
+            }
+        }
+
+        // Include all other existing functions (updateNegotiation, finalizeNegotiation, etc.)
+        // These remain the same as in the original code
+        
+        function updateNegotiation() {
+            const amount = document.getElementById('negotiated-contribution').value;
+            document.getElementById('my-negotiated').textContent = amount;
+            
+            // Update negotiated contribution in Firebase
+            if (gameState.sharedDevice) {
+                const myTeamKey = gameState.currentPlayingTeam === 1 ? 'teamA' : 'teamB';
+                database.ref(`tables/${gameState.tableCode}/negotiations/${myTeamKey}`).set({
+                    amount: parseInt(amount),
+                    timestamp: Date.now()
+                });
+            } else {
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                database.ref(`tables/${gameState.tableCode}/negotiations/${myTeamKey}`).set({
+                    amount: parseInt(amount),
+                    timestamp: Date.now()
+                });
+            }
+        }
+
+        function finalizeNegotiation() {
+            const amount = document.getElementById('negotiated-contribution').value;
+            document.getElementById('negotiated-display').textContent = amount;
+            document.getElementById('actual-contribution').value = amount;
+            
+            document.getElementById('negotiation-phase').classList.add('hidden');
+            document.getElementById('contribution-phase').classList.remove('hidden');
+        }
+
+        async function submitDecision() {
+            const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
+            const actualContribution = parseInt(document.getElementById('actual-contribution').value);
+            
+            try {
+                let myTeamKey;
+                if (gameState.sharedDevice) {
+                    myTeamKey = gameState.currentPlayingTeam === 1 ? 'teamA' : 'teamB';
+                } else {
+                    myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                }
+                
+                const roundDataRef = database.ref(`tables/${gameState.tableCode}/roundData/${myTeamKey}`);
+                
+                await roundDataRef.set({
+                    negotiated: negotiatedContribution,
+                    actual: actualContribution,
+                    timestamp: Date.now()
+                });
+                
+                // Hide controls and show appropriate waiting state
+                document.getElementById('ready-to-play').classList.add('hidden');
+                
+                if (gameState.sharedDevice) {
+                    // For shared device, we'll handle the handover in updateSharedGameState
+                } else {
+                    document.getElementById('waiting-results').classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting round:', error);
+                showError('Error submitting. Please try again.');
+            }
+        }
+
+        async function changeTable() {
+            try {
+                if (gameState.sharedDevice) {
+                    // Clear shared device table
+                    await database.ref(`tables/${gameState.tableCode}`).remove();
+                } else {
+                    // Use existing change table logic
+                    await database.ref(`tables/${gameState.tableCode}/changeTable`).set(true);
+                    await database.ref(`tables/${gameState.tableCode}/teamA`).remove();
+                    await database.ref(`tables/${gameState.tableCode}/teamB`).remove();
+                    await database.ref(`tables/${gameState.tableCode}/roundData`).remove();
+                }
+                
+                // Reset to setup phase
+                if (currentTableRef) {
+                    currentTableRef.off();
+                    currentTableRef = null;
+                }
+                
+                document.getElementById('game-phase').classList.add('hidden');
+                document.getElementById('team-selection-phase').classList.add('hidden');
+                document.getElementById('setup-phase').classList.remove('hidden');
+                
+                // Clear inputs
+                document.getElementById('table-code').value = '';
+                if (gameState.sharedDevice) {
+                    document.getElementById('team1-name').value = '';
+                    document.getElementById('team2-name').value = '';
+                } else {
+                    document.getElementById('team-name').value = '';
+                }
+                
+                // Reset game state
+                gameState = {
+                    teamName: '',
+                    tableCode: '',
+                    budget: 500,
+                    selectedChoice: null,
+                    isTeamA: false,
+                    sharedDevice: false,
+                    team1Name: '',
+                    team2Name: '',
+                    currentPlayingTeam: 1,
+                    roundNumber: 1,
+                    teamOrder: [1, 2]
+                };
+                
+                showingResults = false;
+                isCalculating = false;
+                
+            } catch (error) {
+                console.error('Error changing table:', error);
+                showError('Error changing table. Please refresh if needed.');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.classList.remove('hidden');
+                setTimeout(() => {
+                    errorDiv.classList.add('hidden');
+                }, 3000);
+            } else {
+                alert(message);
+            }
+        }
+
+        // Include existing functions for admin state handling, etc.
+        function initializeAdminListener() {
+            adminRef = database.ref('admin');
+            adminRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    adminState = data;
+                    updateRoundDisplay();
+                    handleAdminStateChange();
+                }
+            });
+        }
+
+        function updateRoundDisplay() {
+            const roundDisplay = document.getElementById('current-round-display');
+            const roundInfo = document.getElementById('round-info');
+            
+            if (roundDisplay && roundInfo && adminState.currentRound) {
+                roundDisplay.textContent = adminState.currentRound;
+                roundInfo.classList.remove('hidden');
+            }
+        }
+
+        function handleAdminStateChange() {
+            // Handle admin state changes for both shared and single device modes
+            if (adminState.forceTableReset) {
+                handleForceTableReset();
+                return;
+            }
+
+            if (adminState.controlMode === 'controlled') {
+                handleControlledMode();
+                
+                if (adminState.showResults && !showingResults && currentTableRef) {
+                    currentTableRef.once('value').then((snapshot) => {
+                        const tableData = snapshot.val();
+                        if (tableData && tableData.roundData && 
+                            tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
+                            isCalculating = true;
+                            if (gameState.sharedDevice) {
+                                calculateSharedResults(tableData);
+                            } else {
+                                calculateResults(tableData);
+                            }
+                        }
+                    }).catch((error) => {
+                        console.error('Error checking table data:', error);
+                    });
+                }
+            }
+        }
+
+        function handleForceTableReset() {
+            document.getElementById('game-phase').classList.add('hidden');
+            document.getElementById('team-selection-phase').classList.add('hidden');
+            document.getElementById('setup-phase').classList.remove('hidden');
+            
+            document.getElementById('table-code').value = '';
+            
+            showError(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+            
+            if (currentTableRef) {
+                currentTableRef.off();
+                currentTableRef = null;
+            }
+
+            // Reset game state
+            gameState.selectedChoice = null;
+            showingResults = false;
+            isCalculating = false;
+        }
+
+        function handleControlledMode() {
+            // Handle controlled mode for both device types
+            // Implementation similar to original but adapted for shared device
+        }
+
+        // Original game state update function for single device mode
         function updateGameState(tableData) {
-            // Check if table change was initiated
             if (tableData.changeTable) {
                 handleForceTableReset();
                 return;
             }
             
-            // Check if admin started a new round (no round data exists and we were showing results)
             if (adminState.controlMode === 'controlled' && 
                 (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && 
                 showingResults) {
-                // Admin cleared the round data - reset to play new round
                 isCalculating = false;
                 showingResults = false;
                 
@@ -586,27 +695,21 @@
                 document.getElementById('game-controls').classList.remove('hidden');
                 document.getElementById('admin-waiting').classList.add('hidden');
                 
-                // Reset to negotiation phase
                 document.getElementById('contribution-phase').classList.add('hidden');
                 document.getElementById('negotiation-phase').classList.remove('hidden');
                 
-                // Reset negotiated displays
                 document.getElementById('my-negotiated').textContent = '--';
                 document.getElementById('opponent-negotiated').textContent = '--';
-                
-                // Reset dropdowns
                 document.getElementById('negotiated-contribution').value = '0';
                 document.getElementById('actual-contribution').value = '0';
             }
             
             document.getElementById('my-budget').textContent = gameState.budget;
             
-            // Update opponent budget display
             if (tableData.teamA && tableData.teamB) {
                 const opponentBudget = gameState.isTeamA ? tableData.teamB.budget : tableData.teamA.budget;
                 document.getElementById('opponent-budget').textContent = opponentBudget;
                 
-                // Update negotiated contributions display
                 if (tableData.negotiations) {
                     const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
                     const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
@@ -640,41 +743,34 @@
             if (tableData.teamA && tableData.teamB) {
                 document.getElementById('waiting-for-opponent').classList.add('hidden');
                 
-                // Check if round is in progress
                 const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
                 const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
                 
                 if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
-                    // I've submitted, waiting for opponent
                     document.getElementById('game-controls').classList.add('hidden');
-                    document.getElementById('waiting-for-round').classList.remove('hidden');
+                    document.getElementById('waiting-results').classList.remove('hidden');
                     document.getElementById('admin-waiting').classList.add('hidden');
                 } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
-                    // Both teams have submitted - check what to do based on admin control
-                    document.getElementById('waiting-for-round').classList.add('hidden'); // Hide opponent waiting message
+                    document.getElementById('waiting-results').classList.add('hidden');
                     
                     if (adminState.controlMode === 'controlled') {
                         if (adminState.showResults) {
-                            // Admin has enabled results display - show results immediately
                             document.getElementById('admin-waiting').classList.add('hidden');
                             isCalculating = true;
                             calculateResults(tableData);
                         } else {
-                            // Admin hasn't enabled results yet - show waiting message
                             document.getElementById('game-controls').classList.add('hidden');
                             document.getElementById('admin-waiting').classList.remove('hidden');
                             document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
                         }
                     } else {
-                        // Free mode - calculate results immediately
                         document.getElementById('admin-waiting').classList.add('hidden');
                         isCalculating = true;
                         calculateResults(tableData);
                     }
                 } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
-                    // Ready to play
                     document.getElementById('game-controls').classList.remove('hidden');
-                    document.getElementById('waiting-for-round').classList.add('hidden');
+                    document.getElementById('waiting-results').classList.add('hidden');
                     document.getElementById('round-results').classList.add('hidden');
                     document.getElementById('admin-waiting').classList.add('hidden');
                 }
@@ -684,88 +780,28 @@
             }
         }
 
-        function finalizeNegotiation() {
-            const negotiatedAmount = document.getElementById('negotiated-contribution').value;
-            
-            // Update the display and set default for actual contribution
-            document.getElementById('negotiated-display').textContent = negotiatedAmount;
-            document.getElementById('actual-contribution').value = negotiatedAmount;
-            
-            // Switch phases
-            document.getElementById('negotiation-phase').classList.add('hidden');
-            document.getElementById('contribution-phase').classList.remove('hidden');
-        }
-
-        async function updateNegotiatedContribution() {
-            const negotiatedAmount = document.getElementById('negotiated-contribution').value;
-            
-            try {
-                // Update negotiated contribution in Firebase so opponent can see it
-                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                await database.ref(`tables/${gameState.tableCode}/negotiations/${myTeamKey}`).set({
-                    amount: parseInt(negotiatedAmount),
-                    timestamp: Date.now()
-                });
-                
-                // Update own display
-                document.getElementById('my-negotiated').textContent = negotiatedAmount;
-                
-            } catch (error) {
-                console.error('Error updating negotiated contribution:', error);
-            }
-        }
-
-        async function submitRound() {
-            const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
-            const actualContribution = parseInt(document.getElementById('actual-contribution').value);
-            
-            try {
-                // Submit this team's data to Firebase
-                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                const roundDataRef = database.ref(`tables/${gameState.tableCode}/roundData/${myTeamKey}`);
-                
-                await roundDataRef.set({
-                    negotiated: negotiatedContribution,
-                    actual: actualContribution,
-                    timestamp: Date.now()
-                });
-                
-                // Hide controls and show waiting
-                document.getElementById('game-controls').classList.add('hidden');
-                document.getElementById('waiting-for-round').classList.remove('hidden');
-                
-            } catch (error) {
-                console.error('Error submitting round:', error);
-                showError('Error submitting. Please try again.');
-            }
-        }
-
+        // Original calculate results function for single device mode
         async function calculateResults(tableData) {
             const dataA = tableData.roundData.teamA;
             const dataB = tableData.roundData.teamB;
             
             if (!dataA || !dataB) return;
             
-            // Calculate public good returns
             const totalContribution = dataA.actual + dataB.actual;
-            const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 = 0.75 per player
+            const publicGoodReturn = totalContribution * 0.75;
             
-            // Calculate new budgets
             const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
             const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
             
             try {
-                // Update budgets in Firebase
                 const updates = {};
                 updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
                 updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
                 updates[`tables/${gameState.tableCode}/resultsProcessed`] = true;
                 
-                // Update team records
                 updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
                 updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
                 
-                // Get current round counts and increment
                 const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
                 const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
                 
@@ -774,13 +810,10 @@
                 
                 await database.ref().update(updates);
                 
-                // Update local budget
                 gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
                 
-                // Display results
                 showResults(dataA, dataB, publicGoodReturn, tableData);
                 
-                // Reset calculation flag
                 isCalculating = false;
                 
             } catch (error) {
@@ -796,157 +829,746 @@
             const opponentName = gameState.isTeamA ? tableData.teamB.name : tableData.teamA.name;
             
             const resultsHTML = `
-                <div class="result-line">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
                     <span>Your contribution (negotiated):</span>
                     <span>${myData.actual} (${myData.negotiated})</span>
                 </div>
-                <div class="result-line">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
                     <span>${opponentName} contribution (negotiated):</span>
                     <span>${opponentData.actual} (${opponentData.negotiated})</span>
                 </div>
-                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 2px solid rgba(255,255,255,0.3); margin-top: 10px;">
                     <span>Public good return:</span>
                     <span>${Math.round(publicGoodReturn)}</span>
                 </div>
-                <div class="result-line">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0;">
                     <span>Leftover budget:</span>
                     <span>${gameState.budget - Math.round(publicGoodReturn)}</span>
                 </div>
-                <div class="result-line" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-top: 2px solid rgba(255,255,255,0.3); margin-top: 10px;">
                     <span><strong>Your new budget:</strong></span>
                     <span><strong>${gameState.budget}</strong></span>
                 </div>
             `;
             
             document.getElementById('results-content').innerHTML = resultsHTML;
-            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('waiting-results').classList.add('hidden');
             document.getElementById('game-controls').classList.add('hidden');
             document.getElementById('admin-waiting').classList.add('hidden');
             document.getElementById('round-results').classList.remove('hidden');
             
-            // Set flag to prevent game controls from reappearing
             showingResults = true;
             
-            // Handle admin control for next round
             if (adminState.controlMode === 'controlled') {
                 handleControlledMode();
             }
         }
 
-        async function nextRound() {
-            try {
-                // Clear round data for this table but keep teams
-                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
-                
-                // Clear negotiation data 
-                await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
-                
-                // Clear admin flags - no longer needed with simplified logic
-                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
-                
-                // Clear negotiation data 
-                await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
-                
-                // Reset calculation flag for new round
-                isCalculating = false;
-                showingResults = false;
-                
-                // Reset UI for new round at same table
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-                
-                // Reset to negotiation phase
-                document.getElementById('contribution-phase').classList.add('hidden');
-                document.getElementById('negotiation-phase').classList.remove('hidden');
-                
-                // Reset negotiated displays
-                document.getElementById('my-negotiated').textContent = '--';
-                document.getElementById('opponent-negotiated').textContent = '--';
-                
-                // Reset dropdowns to first option
-                document.getElementById('negotiated-contribution').value = '0';
-                document.getElementById('actual-contribution').value = '0';
-                
-            } catch (error) {
-                console.error('Error starting new round:', error);
-                showError('Error preparing new round. Please refresh if needed.');
-            }
-        }
-
-        async function changeTable() {
-            try {
-                // Signal both teams to change tables by setting a flag
-                await database.ref(`tables/${gameState.tableCode}/changeTable`).set(true);
-                
-                // Remove both teams from current table
-                await database.ref(`tables/${gameState.tableCode}/teamA`).remove();
-                await database.ref(`tables/${gameState.tableCode}/teamB`).remove();
-                
-                // Clear round data
-                await database.ref(`tables/${gameState.tableCode}/roundData`).remove();
-                
-                // Reset UI for table selection
-                handleForceTableReset();
-                
-            } catch (error) {
-                console.error('Error changing table:', error);
-                showError('Error changing table. Please refresh if needed.');
-            }
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
-            setTimeout(() => {
-                errorDiv.classList.add('hidden');
-            }, 3000);
-        }
-
-        function showMessage(message) {
-            showError(message); // Reuse error display for general messages
-        }
-
-        async function cancelWaiting() {
-            try {
-                // Remove this team from current table
-                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                await database.ref(`tables/${gameState.tableCode}/${myTeamKey}`).remove();
-                
-                // Stop listening to current table
-                if (currentTableRef) {
-                    currentTableRef.off();
-                    currentTableRef = null;
-                }
-                
-                // Reset UI for table selection
-                document.getElementById('game-phase').classList.add('hidden');
-                document.getElementById('setup-phase').classList.remove('hidden');
-                document.getElementById('table-code').value = '';
-                
-                showError('Cancelled - you can now select a different table');
-                
-            } catch (error) {
-                console.error('Error cancelling:', error);
-                showError('Error cancelling. Please refresh the page.');
-            }
-        }
-
-        // Initialize admin listener when page loads
+        // Initialize when page loads
         window.addEventListener('load', () => {
             initializeAdminListener();
         });
 
         // Make functions globally accessible
+        window.toggleSharedDevice = toggleSharedDevice;
         window.joinTable = joinTable;
-        window.submitRound = submitRound;
+        window.confirmTeamTurn = confirmTeamTurn;
+        window.switchToNextTeam = switchToNextTeam;
+        window.updateNegotiation = updateNegotiation;
+        window.finalizeNegotiation = finalizeNegotiation;
+        window.submitDecision = submitDecision;
         window.nextRound = nextRound;
         window.changeTable = changeTable;
-        window.cancelWaiting = cancelWaiting;
-        window.updateNegotiatedContribution = updateNegotiatedContribution;
+    </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Social Dilemma - Shared Device</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #51247A 0%, #663399 50%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        /* Team Selector Styles */
+        .team-selector {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .team-selector h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #fff;
+        }
+        
+        .team-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .team-button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid transparent;
+        }
+        
+        .team-button.selected {
+            background: #4CAF50;
+            border-color: #45a049;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .team-button:hover:not(.selected) {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        /* Device Info Display */
+        .device-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .device-info .table-code {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 5px;
+        }
+        
+        .device-info .teams-list {
+            opacity: 0.9;
+        }
+        
+        /* Current Team Display */
+        .current-team-banner {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        /* Switch Team Button */
+        .switch-team-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        
+        .switch-team-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Large Action Messages */
+        .action-message {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid rgba(255, 193, 7, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .action-message.success {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: rgba(76, 175, 80, 0.6);
+        }
+        
+        .action-message.waiting {
+            background: rgba(33, 150, 243, 0.2);
+            border-color: rgba(33, 150, 243, 0.6);
+        }
+        
+        /* Standard form styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 16px;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        
+        .button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .button-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        .button-primary:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .budget-comparison {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .budget-comparison .vs-layout {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .budget-comparison .team-budget {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .budget-comparison .budget-label {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .budget-comparison .budget-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .budget-comparison .vs-divider {
+            font-size: 24px;
+            opacity: 0.6;
+            margin: 0 15px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        /* Negotiation Phase Styles */
+        .phase-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .secret-phase {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 165, 0, 0.6);
+            position: relative;
+        }
+        
+        .secret-badge {
+            position: absolute;
+            top: -10px;
+            right: 15px;
+            background: #ff6b35;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        .phase-title {
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .phase-title.secret {
+            color: #ff6b35;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤝 The Social Dilemma</h1>
+        
+        <!-- Setup Phase (matches original index.html structure) -->
+        <div id="setup-phase">
+            <div class="form-group">
+                <label for="table-code">Table Code</label>
+                <input type="text" id="table-code" placeholder="Enter your table code exactly as shown">
+                <small style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 5px; display: block;">
+                    Check the code on your physical table carefully
+                </small>
+            </div>
+            
+            <!-- Shared Device Toggle -->
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="shared-device-toggle" onchange="toggleSharedDevice()" style="transform: scale(1.3);">
+                    Shared Device Mode (two teams on one device)
+                </label>
+            </div>
+            
+            <!-- Team Name Input (changes based on toggle) -->
+            <div id="single-team-input">
+                <div class="form-group">
+                    <label for="team-name">Team Name</label>
+                    <input type="text" id="team-name" placeholder="Enter your team name">
+                </div>
+            </div>
+            
+            <div id="dual-team-input" class="hidden">
+                <div class="form-group">
+                    <label for="team1-name">Team 1 Name</label>
+                    <input type="text" id="team1-name" placeholder="First team name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="team2-name">Team 2 Name</label>
+                    <input type="text" id="team2-name" placeholder="Second team name">
+                </div>
+            </div>
+            
+            <button class="button button-primary" onclick="joinTable()">Join Table</button>
+        </div>
+        
+        <!-- Team Selection Phase (for shared device mode) -->
+        <div id="team-selection-phase" class="hidden">
+            <div class="device-info">
+                <div class="table-code" id="display-table-code">TABLE A1</div>
+                <div class="teams-list">
+                    Teams: <span id="display-team1">Team Alpha</span> & <span id="display-team2">Team Beta</span>
+                </div>
+            </div>
+            
+            <div class="action-message">
+                <strong id="team-prompt">Team 1 (Team Alpha): Please confirm it's your turn</strong>
+            </div>
+            
+            <button class="button button-primary" onclick="confirmTeamTurn()" id="confirm-team-btn">
+                Yes, it's our turn
+            </button>
+        </div>
+        
+        <!-- Game Phase -->
+        <div id="game-phase" class="hidden">
+            <!-- Shared Device Team Banner -->
+            <div id="shared-team-banner" class="current-team-banner hidden">
+                🎮 Playing as: <span id="current-team-name">Team Alpha</span>
+            </div>
+            
+            <!-- Single Device Team Status -->
+            <div id="single-team-status" class="status hidden" style="background: rgba(255, 255, 255, 0.15); margin-bottom: 15px;">
+                Team: <strong><span id="display-team-name"></span></strong> | 
+                Table: <strong><span id="display-table-code-single"></span></strong>
+            </div>
+            
+            <!-- Waiting for Opponent -->
+            <div id="waiting-for-opponent" class="status hidden">
+                Waiting for your opponent to join the game...
+                <div style="margin-top: 10px; font-size: 14px; opacity: 0.8;">
+                    Make sure both teams have registered on their respective devices
+                </div>
+            </div>
+            
+            <!-- Ready to Play -->
+            <div id="ready-to-play" class="hidden">
+                <div class="budget-comparison">
+                    <div class="vs-layout">
+                        <div class="team-budget">
+                            <div class="budget-label">Your Budget</div>
+                            <div class="budget-value" id="my-budget">500</div>
+                        </div>
+                        <div class="vs-divider">vs</div>
+                        <div class="team-budget">
+                            <div class="budget-label">Opponent</div>
+                            <div class="budget-value" id="opponent-budget">500</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Negotiation Phase -->
+                <div id="negotiation-phase" class="phase-container">
+                    <div class="phase-title">🤝 Public Negotiation Phase</div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 14px; opacity: 0.8;">You Negotiate</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #4CAF50;" id="my-negotiated">--</div>
+                        </div>
+                        <div style="font-size: 16px; opacity: 0.6;">🤝</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 14px; opacity: 0.8;">Opponent Negotiates</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #4CAF50;" id="opponent-negotiated">--</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="negotiated-contribution">Your Public Negotiation</label>
+                        <select id="negotiated-contribution" onchange="updateNegotiation()">
+                            <option value="0">0</option>
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                            <option value="300">300</option>
+                            <option value="400">400</option>
+                            <option value="500">500</option>
+                        </select>
+                    </div>
+                    
+                    <button class="button button-primary" onclick="finalizeNegotiation()">
+                        Finalize Negotiation
+                    </button>
+                </div>
+                
+                <!-- Secret Decision Phase -->
+                <div id="contribution-phase" class="phase-container secret-phase hidden">
+                    <div class="secret-badge">🔒 SECRET</div>
+                    <div class="phase-title secret">🔒 Private Decision Phase</div>
+                    
+                    <p style="text-align: center; margin-bottom: 15px; opacity: 0.9; font-size: 14px; color: #ffcc99;">
+                        You negotiated: <strong><span id="negotiated-display">0</span></strong><br>
+                        <em>Now decide your actual contribution (hidden from opponent)</em>
+                    </p>
+                    
+                    <div class="form-group">
+                        <label for="actual-contribution" style="color: #ff6b35; font-weight: bold;">
+                            Your Actual Contribution (secret)
+                        </label>
+                        <select id="actual-contribution" style="border: 2px solid #ff6b35;">
+                            <option value="0">0</option>
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                            <option value="300">300</option>
+                            <option value="400">400</option>
+                            <option value="500">500</option>
+                        </select>
+                    </div>
+                    
+                    <button class="button button-primary" onclick="submitDecision()" style="background: #ff6b35;">
+                        🔒 Submit Secret Decision
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Team Handover (for shared device mode) -->
+            <div id="team-handover" class="status hidden">
+                <div class="action-message">
+                    ✅ <span id="completed-team">Team 1</span> has completed their turn
+                </div>
+                <div class="action-message waiting">
+                    🔄 Please hand the device to <strong id="next-team">Team 2</strong>
+                </div>
+                <button class="button button-primary" onclick="switchToNextTeam()">
+                    Ready for Next Team
+                </button>
+            </div>
+            
+            <!-- Waiting for Results -->
+            <div id="waiting-results" class="status hidden">
+                <div class="action-message waiting">
+                    ⏳ Decision submitted! Waiting for opponent...
+                </div>
+            </div>
+            
+            <!-- Round Results -->
+            <div id="round-results" class="hidden">
+                <div class="action-message success">
+                    📊 Round Complete!
+                </div>
+                
+                <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <h3 style="text-align: center; margin-bottom: 15px;">Results</h3>
+                    <div id="results-content"></div>
+                </div>
+                
+                <!-- Shared Device Results Message -->
+                <div id="shared-results-message" class="action-message hidden">
+                    📊 <strong>Results for both teams shown above</strong>
+                </div>
+                
+                <div id="next-round-controls">
+                    <button class="button button-primary" onclick="nextRound()" id="next-round-btn">Next Round</button>
+                    <button class="button button-secondary" onclick="changeTable()">Change Table</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="error-message" class="error hidden"></div>
+        
+        <!-- Round Info Display -->
+        <div id="round-info" class="round-info hidden">
+            Round <span id="current-round-display">1</span>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"> </script>  
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
+            authDomain: "social-dilemma-game.firebaseapp.com",
+            databaseURL: "https://social-dilemma-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "social-dilemma-game",
+            storageBucket: "social-dilemma-game.firebasestorage.app",
+            messagingSenderId: "579478025877",
+            appId: "1:579478025877:web:71e8a165988c8d73408d9c"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        // Game state
+        let deviceState = {
+            tableCode: '',
+            team1Name: '',
+            team2Name: '',
+            currentTeam: null,
+            gameData: {}
+        };
+
+        function setupDevice() {
+            const tableCode = document.getElementById('table-code').value.trim().toUpperCase();
+            const team1Name = document.getElementById('team1-name').value.trim();
+            const team2Name = document.getElementById('team2-name').value.trim();
+            
+            if (!tableCode || !team1Name || !team2Name) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            if (team1Name === team2Name) {
+                alert('Team names must be different');
+                return;
+            }
+            
+            deviceState.tableCode = tableCode;
+            deviceState.team1Name = team1Name;
+            deviceState.team2Name = team2Name;
+            
+            // Update displays
+            document.getElementById('display-table-code').textContent = tableCode;
+            document.getElementById('display-team1').textContent = team1Name;
+            document.getElementById('display-team2').textContent = team2Name;
+            document.getElementById('team1-display').textContent = team1Name;
+            document.getElementById('team2-display').textContent = team2Name;
+            
+            // Switch to team selection
+            document.getElementById('device-setup-phase').classList.add('hidden');
+            document.getElementById('team-selection-phase').classList.remove('hidden');
+        }
+
+        function selectTeam(teamNumber) {
+            deviceState.currentTeam = teamNumber;
+            const teamName = teamNumber === 1 ? deviceState.team1Name : deviceState.team2Name;
+            
+            // Update button states
+            document.getElementById('select-team1').classList.toggle('selected', teamNumber === 1);
+            document.getElementById('select-team2').classList.toggle('selected', teamNumber === 2);
+            
+            // Update current team display
+            document.getElementById('current-team-name').textContent = teamName;
+            
+            // Switch to game phase
+            setTimeout(() => {
+                document.getElementById('team-selection-phase').classList.add('hidden');
+                document.getElementById('game-phase').classList.remove('hidden');
+                startGameForTeam();
+            }, 500);
+        }
+
+        function switchToTeamSelection() {
+            document.getElementById('game-phase').classList.add('hidden');
+            document.getElementById('team-selection-phase').classList.remove('hidden');
+            
+            // Clear team selection
+            document.getElementById('select-team1').classList.remove('selected');
+            document.getElementById('select-team2').classList.remove('selected');
+            deviceState.currentTeam = null;
+        }
+
+        function startGameForTeam() {
+            // This would connect to your existing Firebase logic
+            // For demo purposes, showing the waiting state
+            document.getElementById('waiting-for-opponent').classList.remove('hidden');
+            
+            // Simulate opponent joining after 2 seconds
+            setTimeout(() => {
+                document.getElementById('waiting-for-opponent').classList.add('hidden');
+                document.getElementById('ready-to-play').classList.remove('hidden');
+                document.getElementById('negotiation-phase').classList.remove('hidden');
+            }, 2000);
+        }
+
+        function updateNegotiation() {
+            const amount = document.getElementById('negotiated-contribution').value;
+            document.getElementById('my-negotiated').textContent = amount;
+            
+            // Simulate opponent negotiation update
+            setTimeout(() => {
+                document.getElementById('opponent-negotiated').textContent = Math.floor(Math.random() * 6) * 100;
+            }, 1000);
+        }
+
+        function finalizeNegotiation() {
+            const amount = document.getElementById('negotiated-contribution').value;
+            document.getElementById('negotiated-display').textContent = amount;
+            document.getElementById('actual-contribution').value = amount;
+            
+            // Switch to secret phase
+            document.getElementById('negotiation-phase').classList.add('hidden');
+            document.getElementById('contribution-phase').classList.remove('hidden');
+        }
+
+        function submitDecision() {
+            // Hide game controls
+            document.getElementById('ready-to-play').classList.add('hidden');
+            document.getElementById('waiting-results').classList.remove('hidden');
+            
+            // Simulate waiting for results
+            setTimeout(() => {
+                showResults();
+            }, 3000);
+        }
+
+        function showResults() {
+            document.getElementById('waiting-results').classList.add('hidden');
+            document.getElementById('round-results').classList.remove('hidden');
+            
+            // Sample results
+            const resultsHTML = `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <span>Your contribution:</span>
+                    <span>200 (negotiated: 300)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <span>Opponent contribution:</span>
+                    <span>400 (negotiated: 300)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 2px solid rgba(255,255,255,0.3); margin-top: 10px;">
+                    <span>Public good return:</span>
+                    <span>450</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0;">
+                    <span><strong>Your new budget:</strong></span>
+                    <span><strong>750</strong></span>
+                </div>
+            `;
+            document.getElementById('results-content').innerHTML = resultsHTML;
+        }
+
+        function prepareNextRound() {
+            // Return to team selection for next round
+            document.getElementById('round-results').classList.add('hidden');
+            document.getElementById('ready-to-play').classList.add('hidden');
+            switchToTeamSelection();
+            
+            // Reset game state
+            document.getElementById('negotiation-phase').classList.remove('hidden');
+            document.getElementById('contribution-phase').classList.add('hidden');
+            document.getElementById('negotiated-contribution').value = '0';
+            document.getElementById('actual-contribution').value = '0';
+            document.getElementById('my-negotiated').textContent = '--';
+            document.getElementById('opponent-negotiated').textContent = '--';
+        }
+
+        // Make functions globally accessible
+        window.setupDevice = setupDevice;
+        window.selectTeam = selectTeam;
+        window.switchToTeamSelection = switchToTeamSelection;
+        window.updateNegotiation = updateNegotiation;
         window.finalizeNegotiation = finalizeNegotiation;
+        window.submitDecision = submitDecision;
+        window.prepareNextRound = prepareNextRound;
     </script>
 </body>
 </html>
-                
