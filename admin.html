@@ -56,7 +56,7 @@
             cursor: pointer;
         }
         
-        .mode-controls input[type="radio"] {
+        .mode-controls input[type="radio"], .mode-controls input[type="checkbox"] {
             transform: scale(1.2);
         }
         
@@ -298,6 +298,14 @@
             </label>
         </div>
         
+        <!-- Shared Devices Toggle -->
+        <div class="mode-controls">
+            <label>
+                <input type="checkbox" id="shared-devices-toggle" onchange="toggleSharedDevices()">
+                Shared Devices Mode
+            </label>
+        </div>
+        
         <!-- Round Info -->
         <div class="round-info">
             <h2>Round <span id="current-round">1</span> - Results: <span id="results-status">Hidden</span></h2>
@@ -390,11 +398,12 @@
         let adminState = {
             controlMode: 'free',
             currentRound: 1,
-            showResults: false, // New: controls whether results are visible to students
+            showResults: false,
             allowNewRounds: true,
             processingResults: false,
             forceTableReset: false,
-            adminPassword: 'admin123' // Default password
+            adminPassword: 'admin123',
+            sharedDevices: false // New: controls whether tables use shared devices
         };
 
         let tables = {};
@@ -450,6 +459,9 @@
             // Update mode radio buttons
             document.getElementById('mode-free').checked = adminState.controlMode === 'free';
             document.getElementById('mode-controlled').checked = adminState.controlMode === 'controlled';
+            
+            // Update shared devices toggle
+            document.getElementById('shared-devices-toggle').checked = adminState.sharedDevices || false;
             
             // Update body class for conditional styling
             document.body.className = adminState.controlMode === 'controlled' ? 'controlled-mode' : '';
@@ -620,16 +632,84 @@
             }
         }
 
+        async function toggleSharedDevices() {
+            const isSharedDevices = document.getElementById('shared-devices-toggle').checked;
+            
+            try {
+                await database.ref('admin/sharedDevices').set(isSharedDevices);
+                
+                if (isSharedDevices) {
+                    alert('Shared Devices Mode enabled! Students can use shared devices at tables.');
+                } else {
+                    alert('Shared Devices Mode disabled. Students will use individual devices.');
+                }
+                
+            } catch (error) {
+                console.error('Error toggling shared devices mode:', error);
+                alert('Error updating shared devices mode. Check console for details.');
+            }
+        }
+
         async function toggleResultsDisplay() {
             try {
                 const newShowResults = !adminState.showResults;
                 
-                // Simply toggle the display flag - no calculations here
-                await database.ref('admin/showResults').set(newShowResults);
-                
                 if (newShowResults) {
-                    alert('Results are now visible to students!');
+                    // Showing results - process all completed tables
+                    const updates = {};
+                    let processedCount = 0;
+                    
+                    for (let tableCode in tables) {
+                        const tableData = tables[tableCode];
+                        
+                        if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
+                            // Calculate results
+                            const dataA = tableData.roundData.teamA;
+                            const dataB = tableData.roundData.teamB;
+                            const totalContribution = dataA.actual + dataB.actual;
+                            const publicGoodReturn = (totalContribution * 1.5) / 2;
+                            
+                            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+                            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+                            
+                            // Update budgets
+                            updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
+                            updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                            
+                            // Update team records
+                            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+                            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+                            
+                            // Only increment rounds if this is a new round for the team
+                            // Check if team's round count is less than current admin round
+                            const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
+                            const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
+                            const currentAdminRound = adminState.currentRound || 1;
+                            
+                            if (teamACurrentRounds < currentAdminRound) {
+                                updates[`teams/${tableData.teamA.name}/totalRounds`] = currentAdminRound;
+                            }
+                            if (teamBCurrentRounds < currentAdminRound) {
+                                updates[`teams/${tableData.teamB.name}/totalRounds`] = currentAdminRound;
+                            }
+                            
+                            processedCount++;
+                        }
+                    }
+                    
+                    // Set results as visible
+                    updates['admin/showResults'] = true;
+                    
+                    await database.ref().update(updates);
+                    
+                    if (processedCount > 0) {
+                        alert(`Results now visible to ${processedCount} completed tables!`);
+                    } else {
+                        alert('Results display toggled, but no completed tables to show results for.');
+                    }
                 } else {
+                    // Hiding results (probably rare, but possible)
+                    await database.ref('admin/showResults').set(false);
                     alert('Results are now hidden from students.');
                 }
                 
@@ -788,6 +868,7 @@
 
         // Make functions globally accessible
         window.changeControlMode = changeControlMode;
+        window.toggleSharedDevices = toggleSharedDevices;
         window.toggleResultsDisplay = toggleResultsDisplay;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
