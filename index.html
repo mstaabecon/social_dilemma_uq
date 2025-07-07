@@ -251,6 +251,10 @@
                 <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
             </div>
             
+            <div id="waiting-for-turn" class="status hidden">
+                Waiting for opponent entry - please pass device to other team and switch tab
+            </div>
+            
             <div id="admin-waiting" class="status admin-status hidden">
                 <strong>Waiting for instructor...</strong><br>
                 <span id="admin-message">The instructor will start the next round soon.</span>
@@ -535,6 +539,11 @@
                 // Set shared device flag if this is the first team to join
                 if (!tableData.teamA && !tableData.teamB) {
                     tableData.isSharedDevice = isSharedDevice;
+                    // Initialize turn tracking for shared devices
+                    if (isSharedDevice) {
+                        tableData.currentTurn = 1;
+                        tableData.roundOrder = [1, 2];
+                    }
                 }
                 
                 // Get team's existing budget
@@ -618,6 +627,7 @@
                 document.getElementById('round-results').classList.add('hidden');
                 document.getElementById('game-controls').classList.remove('hidden');
                 document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
                 
                 // Reset to negotiation phase
                 document.getElementById('contribution-phase').classList.add('hidden');
@@ -673,47 +683,110 @@
             if (tableData.teamA && tableData.teamB) {
                 document.getElementById('waiting-for-opponent').classList.add('hidden');
                 
-                // Check if round is in progress
-                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
-                
-                if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
-                    // I've submitted, waiting for opponent
-                    document.getElementById('game-controls').classList.add('hidden');
-                    document.getElementById('waiting-for-round').classList.remove('hidden');
-                    document.getElementById('admin-waiting').classList.add('hidden');
-                } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
-                    // Both teams have submitted - check what to do based on admin control
-                    document.getElementById('waiting-for-round').classList.add('hidden'); // Hide opponent waiting message
-                    
-                    if (adminState.controlMode === 'controlled') {
-                        if (adminState.showResults) {
-                            // Admin has enabled results display - show results immediately
-                            document.getElementById('admin-waiting').classList.add('hidden');
-                            isCalculating = true;
-                            calculateResults(tableData);
-                        } else {
-                            // Admin hasn't enabled results yet - show waiting message
-                            document.getElementById('game-controls').classList.add('hidden');
-                            document.getElementById('admin-waiting').classList.remove('hidden');
-                            document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
-                        }
-                    } else {
-                        // Free mode - calculate results immediately
-                        document.getElementById('admin-waiting').classList.add('hidden');
-                        isCalculating = true;
-                        calculateResults(tableData);
-                    }
-                } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
-                    // Ready to play
-                    document.getElementById('game-controls').classList.remove('hidden');
-                    document.getElementById('waiting-for-round').classList.add('hidden');
-                    document.getElementById('round-results').classList.add('hidden');
-                    document.getElementById('admin-waiting').classList.add('hidden');
+                // For shared devices, handle turn-based play
+                if (tableData.isSharedDevice) {
+                    handleSharedDeviceTurns(tableData);
+                } else {
+                    // Original simultaneous play logic for non-shared devices
+                    handleSimultaneousPlay(tableData);
                 }
             } else {
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
+            }
+        }
+
+        function handleSharedDeviceTurns(tableData) {
+            const myTeamNumber = gameState.isTeamA ? 1 : 2;
+            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+            
+            // Check if it's my turn
+            const isMyTurn = tableData.currentTurn === myTeamNumber;
+            
+            // Check submission status
+            const iHaveSubmitted = tableData.roundData && tableData.roundData[myTeamKey];
+            const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
+            
+            if (iHaveSubmitted && opponentHasSubmitted && !isCalculating) {
+                // Both teams have submitted - show results or wait for admin
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                
+                if (adminState.controlMode === 'controlled') {
+                    if (adminState.showResults) {
+                        document.getElementById('admin-waiting').classList.add('hidden');
+                        isCalculating = true;
+                        calculateResults(tableData);
+                    } else {
+                        document.getElementById('game-controls').classList.add('hidden');
+                        document.getElementById('admin-waiting').classList.remove('hidden');
+                        document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                    }
+                } else {
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    isCalculating = true;
+                    calculateResults(tableData);
+                }
+            } else if (iHaveSubmitted) {
+                // I've submitted, waiting for opponent
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            } else if (isMyTurn) {
+                // It's my turn to play
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            } else {
+                // It's not my turn, waiting for opponent to play
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            }
+        }
+
+        function handleSimultaneousPlay(tableData) {
+            // Original logic for non-shared devices (simultaneous play)
+            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+            
+            if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
+                // I've submitted, waiting for opponent
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.remove('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+            } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
+                // Both teams have submitted
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                
+                if (adminState.controlMode === 'controlled') {
+                    if (adminState.showResults) {
+                        document.getElementById('admin-waiting').classList.add('hidden');
+                        isCalculating = true;
+                        calculateResults(tableData);
+                    } else {
+                        document.getElementById('game-controls').classList.add('hidden');
+                        document.getElementById('admin-waiting').classList.remove('hidden');
+                        document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                    }
+                } else {
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    isCalculating = true;
+                    calculateResults(tableData);
+                }
+            } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
+                // Ready to play
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
             }
         }
 
@@ -765,7 +838,26 @@
                 
                 // Hide controls and show waiting
                 document.getElementById('game-controls').classList.add('hidden');
-                document.getElementById('waiting-for-round').classList.remove('hidden');
+                
+                // For shared devices, update turn after submission
+                const tableRef = database.ref(`tables/${gameState.tableCode}`);
+                const tableSnapshot = await tableRef.once('value');
+                const tableData = tableSnapshot.val();
+                
+                if (tableData && tableData.isSharedDevice) {
+                    const myTeamNumber = gameState.isTeamA ? 1 : 2;
+                    const opponentTeamNumber = myTeamNumber === 1 ? 2 : 1;
+                    
+                    // Check if opponent has already submitted
+                    const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+                    const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
+                    
+                    if (!opponentHasSubmitted) {
+                        // Switch turn to opponent
+                        await database.ref(`tables/${gameState.tableCode}/currentTurn`).set(opponentTeamNumber);
+                    }
+                    // If opponent already submitted, results will be calculated automatically
+                }
                 
             } catch (error) {
                 console.error('Error submitting round:', error);
