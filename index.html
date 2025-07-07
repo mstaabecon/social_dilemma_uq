@@ -1012,6 +1012,34 @@
                 helperText.style.marginTop = '5px';
                 helperText.textContent = 'Table code pre-filled for opponent registration';
                 tableGroup.appendChild(helperText);
+                
+                // Check if this table is already marked as shared device
+                database.ref(`tables/${tableCode.toUpperCase()}`).once('value').then((snapshot) => {
+                    const tableData = snapshot.val();
+                    if (tableData && tableData.isSharedDevice) {
+                        // Pre-check and disable the shared device toggle
+                        const sharedDeviceCheckbox = document.getElementById('is-shared-device');
+                        sharedDeviceCheckbox.checked = true;
+                        sharedDeviceCheckbox.disabled = true;
+                        
+                        // Add visual indication
+                        const sharedDeviceOption = document.getElementById('shared-device-option');
+                        if (sharedDeviceOption) {
+                            sharedDeviceOption.style.opacity = '0.7';
+                            
+                            // Add helper text for shared device
+                            const sharedHelperText = document.createElement('small');
+                            sharedHelperText.style.color = '#4CAF50';
+                            sharedHelperText.style.fontSize = '13px';
+                            sharedHelperText.style.display = 'block';
+                            sharedHelperText.style.marginTop = '5px';
+                            sharedHelperText.textContent = 'Shared device mode set by first team';
+                            sharedDeviceOption.appendChild(sharedHelperText);
+                        }
+                    }
+                }).catch((error) => {
+                    console.error('Error checking table shared device status:', error);
+                });
             }
         }
 
