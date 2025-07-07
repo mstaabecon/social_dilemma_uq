@@ -262,14 +262,25 @@
 
         // Initialize leaderboard
         function initializeLeaderboard() {
+            // Debug: List all elements we're looking for
+            console.log('Looking for DOM elements...');
+            console.log('leaderboard-content:', document.getElementById('leaderboard-content'));
+            console.log('access-denied:', document.getElementById('access-denied'));
+            console.log('total-teams:', document.getElementById('total-teams'));
+            console.log('teams-container:', document.getElementById('teams-container'));
+            
             // Ensure DOM elements exist before trying to access them
             const leaderboardContent = document.getElementById('leaderboard-content');
             const accessDenied = document.getElementById('access-denied');
             
             if (!leaderboardContent || !accessDenied) {
                 console.error('Required DOM elements not found');
+                console.error('leaderboardContent:', leaderboardContent);
+                console.error('accessDenied:', accessDenied);
                 return;
             }
+            
+            console.log('DOM elements found, proceeding with initialization');
             
             // First check if leaderboard is enabled
             database.ref('admin/leaderboardEnabled').on('value', (snapshot) => {
