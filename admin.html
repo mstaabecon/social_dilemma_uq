@@ -357,6 +357,9 @@
             <button class="button button-warning" onclick="resetAllTables()" id="reset-btn">
                 Reset All Tables & Force Re-pairing
             </button>
+            <button class="button button-secondary" onclick="breakAllTies()">
+                Break All Ties (Final Ranking)
+            </button>
             <button class="button button-secondary" onclick="changePassword()">
                 Change Admin Password
             </button>
@@ -836,6 +839,72 @@
             }
         }
 
+        async function breakAllTies() {
+            if (!confirm('This will break all ties by randomly assigning +1 to winners and +0 to others within each tied group. This action cannot be undone. Continue?')) {
+                return;
+            }
+            
+            try {
+                const updates = {};
+                let tiesFound = 0;
+                let groupsProcessed = 0;
+                
+                // Group teams by budget to find ties
+                const budgetGroups = {};
+                Object.entries(teams).forEach(([teamName, teamData]) => {
+                    const budget = teamData.budget || 500;
+                    if (!budgetGroups[budget]) {
+                        budgetGroups[budget] = [];
+                    }
+                    budgetGroups[budget].push({ name: teamName, data: teamData });
+                });
+                
+                // For each budget group with more than one team, break ties
+                Object.entries(budgetGroups).forEach(([budget, teamsInGroup]) => {
+                    if (teamsInGroup.length > 1) {
+                        tiesFound += teamsInGroup.length;
+                        groupsProcessed++;
+                        
+                        // Randomly shuffle the tied teams
+                        const shuffledTeams = [...teamsInGroup].sort(() => Math.random() - 0.5);
+                        
+                        // Assign +1 to first team (winner), +0 to others
+                        shuffledTeams.forEach(({ name, data }, index) => {
+                            const bonus = index === 0 ? 1 : 0; // First team gets +1, others get +0
+                            const newBudget = (data.budget || 500) + bonus;
+                            
+                            // Update both teams and tables collections
+                            updates[`teams/${name}/budget`] = newBudget;
+                            
+                            // Also update any active table references
+                            Object.entries(tables).forEach(([tableCode, tableData]) => {
+                                if (tableData.teamA && tableData.teamA.name === name) {
+                                    updates[`tables/${tableCode}/teamA/budget`] = newBudget;
+                                }
+                                if (tableData.teamB && tableData.teamB.name === name) {
+                                    updates[`tables/${tableCode}/teamB/budget`] = newBudget;
+                                }
+                            });
+                        });
+                    }
+                });
+                
+                if (tiesFound === 0) {
+                    alert('No ties found to break.');
+                    return;
+                }
+                
+                // Apply all updates
+                await database.ref().update(updates);
+                
+                alert(`Ties broken! ${groupsProcessed} tied groups processed, affecting ${tiesFound} teams. Winners got +1, others got +0.`);
+                
+            } catch (error) {
+                console.error('Error breaking ties:', error);
+                alert('Error breaking ties. Check console for details.');
+            }
+        }
+
         async function exportData() {
             try {
                 const data = {
@@ -903,6 +972,7 @@
         window.toggleResultsDisplay = toggleResultsDisplay;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
+        window.breakAllTies = breakAllTies;
         window.changePassword = changePassword;
         window.exportData = exportData;
     </script>
