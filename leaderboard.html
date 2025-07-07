@@ -361,24 +361,35 @@
             teamsList.sort(([,a], [,b]) => (b.budget || 0) - (a.budget || 0));
             
             let html = '';
+            let currentRank = 1;
+            let previousBudget = null;
+            
             teamsList.forEach(([teamName, teamData], index) => {
-                const rank = index + 1;
-                const rankClass = rank <= 3 ? `rank-${rank}` : '';
-                const itemClass = rank <= 3 ? `rank-${rank}` : '';
-                const trophy = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+                const budget = teamData.budget || 500;
+                
+                // If budget is different from previous, update rank to current position
+                if (previousBudget !== null && budget !== previousBudget) {
+                    currentRank = index + 1;
+                }
+                
+                const rankClass = currentRank <= 3 ? `rank-${currentRank}` : '';
+                const itemClass = currentRank <= 3 ? `rank-${currentRank}` : '';
+                const trophy = currentRank === 1 ? '🥇' : currentRank === 2 ? '🥈' : currentRank === 3 ? '🥉' : '';
                 
                 html += `
                     <div class="team-item ${itemClass}">
                         <div class="team-info">
-                            <div class="team-rank ${rankClass}">${trophy}${rank}</div>
+                            <div class="team-rank ${rankClass}">${trophy}${currentRank}</div>
                             <div class="team-name">${teamName}</div>
                         </div>
                         <div class="team-stats">
-                            <div class="team-budget">${teamData.budget || 500}</div>
+                            <div class="team-budget">${budget}</div>
                             <div class="team-rounds">${teamData.totalRounds || 0} rounds</div>
                         </div>
                     </div>
                 `;
+                
+                previousBudget = budget;
             });
             
             container.innerHTML = html;
