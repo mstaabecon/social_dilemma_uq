@@ -226,9 +226,9 @@
             
             <!-- Shared Device Toggle (only visible when admin enables shared device mode) -->
             <div class="form-group" id="shared-device-option" style="display: none;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="is-shared-device" style="transform: scale(1.3);">
-                    This is a shared device (two teams using one device)
+                <label style="display: flex; align-items: center; justify-content: flex-start; gap: 12px; cursor: pointer; text-align: left;">
+                    <input type="checkbox" id="is-shared-device" style="transform: scale(1.4); margin: 0; flex-shrink: 0;">
+                    <span style="flex: 1; line-height: 1.4;">This is a shared device (two teams using one device)</span>
                 </label>
             </div>
             
@@ -443,10 +443,15 @@
 
             // Show/hide shared device option based on admin setting
             const sharedDeviceOption = document.getElementById('shared-device-option');
+            const sharedDeviceCheckbox = document.getElementById('is-shared-device');
+            
             if (adminState.sharedDevices) {
                 sharedDeviceOption.style.display = 'block';
+                // Check the toggle by default when admin enables shared device mode
+                sharedDeviceCheckbox.checked = true;
             } else {
                 sharedDeviceOption.style.display = 'none';
+                sharedDeviceCheckbox.checked = false;
             }
 
             // Handle centrally controlled mode
