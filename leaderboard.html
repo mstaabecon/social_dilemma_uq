@@ -262,21 +262,32 @@
 
         // Initialize leaderboard
         function initializeLeaderboard() {
+            // Ensure DOM elements exist before trying to access them
+            const leaderboardContent = document.getElementById('leaderboard-content');
+            const accessDenied = document.getElementById('access-denied');
+            
+            if (!leaderboardContent || !accessDenied) {
+                console.error('Required DOM elements not found');
+                return;
+            }
+            
             // First check if leaderboard is enabled
             database.ref('admin/leaderboardEnabled').on('value', (snapshot) => {
                 const isEnabled = snapshot.val();
                 
+                console.log('Leaderboard enabled status:', isEnabled); // Debug log
+                
                 if (isEnabled) {
                     // Show leaderboard
-                    document.getElementById('leaderboard-content').style.display = 'block';
-                    document.getElementById('access-denied').style.display = 'none';
+                    leaderboardContent.style.display = 'block';
+                    accessDenied.style.display = 'none';
                     
                     // Start listening to data
                     startDataListeners();
                 } else {
                     // Hide leaderboard and show access denied
-                    document.getElementById('leaderboard-content').style.display = 'none';
-                    document.getElementById('access-denied').style.display = 'block';
+                    leaderboardContent.style.display = 'none';
+                    accessDenied.style.display = 'block';
                     
                     // Stop listening to data
                     stopDataListeners();
@@ -288,10 +299,13 @@
         let adminListener = null;
 
         function startDataListeners() {
+            console.log('Starting data listeners'); // Debug log
+            
             // Listen to teams data
             if (!teamsListener) {
                 teamsListener = database.ref('teams').on('value', (snapshot) => {
                     teams = snapshot.val() || {};
+                    console.log('Teams data updated:', teams); // Debug log
                     updateLeaderboard();
                     updateStats();
                     updateLastUpdated();
@@ -302,12 +316,15 @@
             if (!adminListener) {
                 adminListener = database.ref('admin').on('value', (snapshot) => {
                     adminState = snapshot.val() || {};
+                    console.log('Admin state updated:', adminState); // Debug log
                     updateStats();
                 });
             }
         }
 
         function stopDataListeners() {
+            console.log('Stopping data listeners'); // Debug log
+            
             if (teamsListener) {
                 database.ref('teams').off('value', teamsListener);
                 teamsListener = null;
@@ -382,7 +399,11 @@
 
         // Initialize when page loads
         window.addEventListener('load', () => {
-            initializeLeaderboard();
+            console.log('Page loaded, initializing leaderboard');
+            // Add a small delay to ensure Firebase is ready
+            setTimeout(() => {
+                initializeLeaderboard();
+            }, 500);
         });
     </script>
 </body>
