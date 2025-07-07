@@ -249,11 +249,18 @@
                     Opponent Registration
                     <br><small style="font-size: 12px; opacity: 0.8;">opens new tab</small>
                 </button>
+                <button class="button button-secondary" onclick="openNewTab()" style="margin-top: 10px; width: auto; padding: 8px 16px;">
+                    Accidentally closed tab? Open new tab
+                </button>
                 <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
             </div>
             
             <div id="waiting-for-turn" class="status hidden">
                 Waiting for opponent - please pass device to other team and switch tab
+                <br><br>
+                <button class="button button-secondary" onclick="openNewTab()" style="width: auto; padding: 8px 16px;">
+                    Accidentally closed tab? Open new tab
+                </button>
             </div>
             
             <div id="admin-waiting" class="status admin-status hidden">
@@ -1059,6 +1066,12 @@
             showError(message); // Reuse error display for general messages
         }
 
+        function openNewTab() {
+            const tableCode = gameState.tableCode;
+            const newTabUrl = `index.html?table=${tableCode}`;
+            window.open(newTabUrl, '_blank');
+        }
+
         function openOpponentRegistration() {
             const tableCode = gameState.tableCode;
             const newTabUrl = `index.html?table=${tableCode}`;
@@ -1154,6 +1167,7 @@
         window.submitRound = submitRound;
         window.nextRound = nextRound;
         window.changeTable = changeTable;
+        window.openNewTab = openNewTab;
         window.openOpponentRegistration = openOpponentRegistration;
         window.cancelWaiting = cancelWaiting;
         window.updateNegotiatedContribution = updateNegotiatedContribution;
