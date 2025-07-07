@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Dilemma - Leaderboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #51247A 0%, #663399 50%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: white;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 36px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .subtitle {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 18px;
+            opacity: 0.9;
+            color: #fff;
+        }
+        
+        .stats-header {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #4CAF50;
+        }
+        
+        .stat-label {
+            font-size: 16px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        
+        .leaderboard {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .leaderboard-header {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 80px 1fr 120px 120px;
+            gap: 20px;
+            font-weight: bold;
+            font-size: 16px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .team-row {
+            padding: 15px 20px;
+            display: grid;
+            grid-template-columns: 80px 1fr 120px 120px;
+            gap: 20px;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease;
+        }
+        
+        .team-row:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .team-row:last-child {
+            border-bottom: none;
+        }
+        
+        .rank {
+            font-weight: bold;
+            font-size: 20px;
+            text-align: center;
+        }
+        
+        .rank.first {
+            color: #FFD700;
+            font-size: 24px;
+        }
+        
+        .rank.second {
+            color: #C0C0C0;
+            font-size: 22px;
+        }
+        
+        .rank.third {
+            color: #CD7F32;
+            font-size: 22px;
+        }
+        
+        .team-name {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .budget {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            color: #4CAF50;
+        }
+        
+        .rounds {
+            font-size: 16px;
+            text-align: center;
+            opacity: 0.9;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.7;
+            font-size: 18px;
+            font-style: italic;
+        }
+        
+        .last-updated {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        .trophy {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 28px;
+            }
+            
+            .leaderboard-header,
+            .team-row {
+                grid-template-columns: 60px 1fr 100px 80px;
+                gap: 10px;
+                padding: 15px;
+            }
+            
+            .team-name {
+                font-size: 16px;
+            }
+            
+            .budget {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏆 Leaderboard</h1>
+        <div class="subtitle">The Social Dilemma Championship</div>
+        
+        <!-- Game Stats -->
+        <div class="stats-header">
+            <div class="stat-card">
+                <div class="stat-value" id="total-teams">0</div>
+                <div class="stat-label">Teams</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="current-round">1</div>
+                <div class="stat-label">Current Round</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-budget">500</div>
+                <div class="stat-label">Average Budget</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="highest-budget">500</div>
+                <div class="stat-label">Highest Budget</div>
+            </div>
+        </div>
+        
+        <!-- Leaderboard -->
+        <div class="leaderboard">
+            <div class="leaderboard-header">
+                <div>Rank</div>
+                <div>Team Name</div>
+                <div>Budget</div>
+                <div>Rounds</div>
+            </div>
+            <div id="teams-container">
+                <div class="empty-state">No teams have joined yet</div>
+            </div>
+        </div>
+        
+        <div class="last-updated">
+            Last updated: <span id="last-updated-time">--</span>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
+            authDomain: "social-dilemma-game.firebaseapp.com",
+            databaseURL: "https://social-dilemma-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "social-dilemma-game",
+            storageBucket: "social-dilemma-game.firebasestorage.app",
+            messagingSenderId: "579478025877",
+            appId: "1:579478025877:web:71e8a165988c8d73408d9c"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let teams = {};
+        let adminState = {};
+
+        // Initialize leaderboard
+        function initializeLeaderboard() {
+            // First check if leaderboard is enabled
+            database.ref('admin/leaderboardEnabled').on('value', (snapshot) => {
+                const isEnabled = snapshot.val();
+                
+                if (isEnabled) {
+                    // Show leaderboard
+                    document.getElementById('leaderboard-content').style.display = 'block';
+                    document.getElementById('access-denied').style.display = 'none';
+                    
+                    // Start listening to data
+                    startDataListeners();
+                } else {
+                    // Hide leaderboard and show access denied
+                    document.getElementById('leaderboard-content').style.display = 'none';
+                    document.getElementById('access-denied').style.display = 'block';
+                    
+                    // Stop listening to data
+                    stopDataListeners();
+                }
+            });
+        }
+
+        let teamsListener = null;
+        let adminListener = null;
+
+        function startDataListeners() {
+            // Listen to teams data
+            if (!teamsListener) {
+                teamsListener = database.ref('teams').on('value', (snapshot) => {
+                    teams = snapshot.val() || {};
+                    updateLeaderboard();
+                    updateStats();
+                    updateLastUpdated();
+                });
+            }
+            
+            // Listen to admin state for current round
+            if (!adminListener) {
+                adminListener = database.ref('admin').on('value', (snapshot) => {
+                    adminState = snapshot.val() || {};
+                    updateStats();
+                });
+            }
+        }
+
+        function stopDataListeners() {
+            if (teamsListener) {
+                database.ref('teams').off('value', teamsListener);
+                teamsListener = null;
+            }
+            
+            if (adminListener) {
+                database.ref('admin').off('value', adminListener);
+                adminListener = null;
+            }
+        }
+
+        function updateLeaderboard() {
+            const container = document.getElementById('teams-container');
+            const teamsList = Object.entries(teams);
+            
+            if (teamsList.length === 0) {
+                container.innerHTML = '<div class="empty-state">No teams have joined yet</div>';
+                return;
+            }
+            
+            // Sort teams by budget (descending)
+            teamsList.sort(([,a], [,b]) => (b.budget || 500) - (a.budget || 500));
+            
+            let html = '';
+            teamsList.forEach(([teamName, teamData], index) => {
+                const rank = index + 1;
+                const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
+                const trophy = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+                
+                html += `
+                    <div class="team-row">
+                        <div class="rank ${rankClass}">
+                            ${trophy}${rank}
+                        </div>
+                        <div class="team-name">${teamName}</div>
+                        <div class="budget">${teamData.budget || 500}</div>
+                        <div class="rounds">${teamData.totalRounds || 0}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function updateStats() {
+            const teamsList = Object.entries(teams);
+            const totalTeams = teamsList.length;
+            
+            let avgBudget = 500;
+            let highestBudget = 500;
+            
+            if (totalTeams > 0) {
+                const budgets = teamsList.map(([, team]) => team.budget || 500);
+                avgBudget = Math.round(budgets.reduce((sum, budget) => sum + budget, 0) / totalTeams);
+                highestBudget = Math.max(...budgets);
+            }
+            
+            document.getElementById('total-teams').textContent = totalTeams;
+            document.getElementById('current-round').textContent = adminState.currentRound || 1;
+            document.getElementById('avg-budget').textContent = avgBudget;
+            document.getElementById('highest-budget').textContent = highestBudget;
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-updated-time').textContent = timeString;
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(updateLastUpdated, 5000);
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            initializeLeaderboard();
+        });
+    </script>
+</body>
+</html>

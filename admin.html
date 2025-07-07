@@ -306,6 +306,14 @@
             </label>
         </div>
         
+        <!-- Leaderboard Toggle -->
+        <div class="mode-controls">
+            <label>
+                <input type="checkbox" id="leaderboard-toggle" onchange="toggleLeaderboard()">
+                Enable Public Leaderboard
+            </label>
+        </div>
+        
         <!-- Round Info -->
         <div class="round-info">
             <h2>Round <span id="current-round">1</span> - Results: <span id="results-status">Hidden</span></h2>
@@ -403,7 +411,8 @@
             processingResults: false,
             forceTableReset: false,
             adminPassword: 'admin123',
-            sharedDevices: false // New: controls whether tables use shared devices
+            sharedDevices: false, // New: controls whether tables use shared devices
+            leaderboardEnabled: false // New: controls whether leaderboard is visible
         };
 
         let tables = {};
@@ -462,6 +471,9 @@
             
             // Update shared devices toggle
             document.getElementById('shared-devices-toggle').checked = adminState.sharedDevices || false;
+            
+            // Update leaderboard toggle
+            document.getElementById('leaderboard-toggle').checked = adminState.leaderboardEnabled || false;
             
             // Update body class for conditional styling
             document.body.className = adminState.controlMode === 'controlled' ? 'controlled-mode' : '';
@@ -647,6 +659,24 @@
             } catch (error) {
                 console.error('Error toggling shared devices mode:', error);
                 alert('Error updating shared devices mode. Check console for details.');
+            }
+        }
+
+        async function toggleLeaderboard() {
+            const isLeaderboardEnabled = document.getElementById('leaderboard-toggle').checked;
+            
+            try {
+                await database.ref('admin/leaderboardEnabled').set(isLeaderboardEnabled);
+                
+                if (isLeaderboardEnabled) {
+                    alert('Public Leaderboard enabled! You can now project leaderboard.html');
+                } else {
+                    alert('Public Leaderboard disabled. Leaderboard page will show access denied message.');
+                }
+                
+            } catch (error) {
+                console.error('Error toggling leaderboard:', error);
+                alert('Error updating leaderboard setting. Check console for details.');
             }
         }
 
@@ -869,6 +899,7 @@
         // Make functions globally accessible
         window.changeControlMode = changeControlMode;
         window.toggleSharedDevices = toggleSharedDevices;
+        window.toggleLeaderboard = toggleLeaderboard;
         window.toggleResultsDisplay = toggleResultsDisplay;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
