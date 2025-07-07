@@ -245,6 +245,9 @@
             <div id="waiting-for-opponent" class="status hidden">
                 Waiting for opponent team to join<br>
                 <small style="color: rgba(255,255,255,0.8);">Wrong table? Use the button below to try again</small><br>
+                <button class="button button-primary" onclick="openOpponentRegistration()" id="opponent-registration-btn" style="margin-top: 10px; display: none;">
+                    📱 Opponent Registration (opens new tab)
+                </button>
                 <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
             </div>
             
@@ -596,6 +599,14 @@
                 return;
             }
             
+            // Show opponent registration button if this is a shared device table
+            const opponentRegBtn = document.getElementById('opponent-registration-btn');
+            if (tableData.isSharedDevice && !tableData.teamB) {
+                opponentRegBtn.style.display = 'block';
+            } else {
+                opponentRegBtn.style.display = 'none';
+            }
+            
             // Check if admin started a new round (no round data exists and we were showing results)
             if (adminState.controlMode === 'controlled' && 
                 (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && 
@@ -942,6 +953,12 @@
             showError(message); // Reuse error display for general messages
         }
 
+        function openOpponentRegistration() {
+            const tableCode = gameState.tableCode;
+            const newTabUrl = `index.html?table=${tableCode}`;
+            window.open(newTabUrl, '_blank');
+        }
+
         async function cancelWaiting() {
             try {
                 // Remove this team from current table
@@ -970,13 +987,40 @@
         // Initialize admin listener when page loads
         window.addEventListener('load', () => {
             initializeAdminListener();
+            checkURLParameters();
         });
+
+        function checkURLParameters() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tableCode = urlParams.get('table');
+            
+            if (tableCode) {
+                // Pre-fill the table code field
+                document.getElementById('table-code').value = tableCode.toUpperCase();
+                
+                // Add visual indication that this is pre-filled
+                const tableInput = document.getElementById('table-code');
+                tableInput.style.background = 'rgba(76, 175, 80, 0.2)';
+                tableInput.style.border = '2px solid #4CAF50';
+                
+                // Add helper text
+                const tableGroup = tableInput.parentElement;
+                const helperText = document.createElement('small');
+                helperText.style.color = '#4CAF50';
+                helperText.style.fontSize = '14px';
+                helperText.style.display = 'block';
+                helperText.style.marginTop = '5px';
+                helperText.textContent = 'Table code pre-filled for opponent registration';
+                tableGroup.appendChild(helperText);
+            }
+        }
 
         // Make functions globally accessible
         window.joinTable = joinTable;
         window.submitRound = submitRound;
         window.nextRound = nextRound;
         window.changeTable = changeTable;
+        window.openOpponentRegistration = openOpponentRegistration;
         window.cancelWaiting = cancelWaiting;
         window.updateNegotiatedContribution = updateNegotiatedContribution;
         window.finalizeNegotiation = finalizeNegotiation;
