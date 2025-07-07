@@ -214,7 +214,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" id="leaderboard-content">
         <h1>🏆 Leaderboard</h1>
         <div class="subtitle">The Social Dilemma Game</div>
         
@@ -251,6 +251,19 @@
         </div>
     </div>
 
+    <!-- Leaderboard Disabled Message -->
+    <div class="container" id="leaderboard-disabled" style="display: none; text-align: center;">
+        <h1>📊 Leaderboard</h1>
+        <div class="subtitle">The Social Dilemma Game</div>
+        
+        <div style="margin-top: 60px; padding: 40px; background: rgba(255, 255, 255, 0.1); border-radius: 15px;">
+            <div style="font-size: 48px; margin-bottom: 20px;">🔒</div>
+            <h2 style="font-size: 24px; margin-bottom: 20px; color: #fff;">Leaderboard Not Available</h2>
+            <p style="font-size: 18px; margin-bottom: 15px; opacity: 0.9;">The leaderboard needs to be enabled in the admin interface.</p>
+            <p style="opacity: 0.8;">Please contact your instructor to enable the public leaderboard.</p>
+        </div>
+    </div>
+
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -277,31 +290,62 @@
         // Initialize leaderboard
         async function initializeLeaderboard() {
             try {
-                // Set up listeners (same as admin interface)
-                setupListeners();
-                updateStats();
+                // First check if leaderboard is enabled
+                database.ref('admin/leaderboardEnabled').on('value', (snapshot) => {
+                    const isEnabled = snapshot.val();
+                    
+                    if (isEnabled) {
+                        // Show leaderboard and start data listeners
+                        document.getElementById('leaderboard-content').style.display = 'block';
+                        document.getElementById('leaderboard-disabled').style.display = 'none';
+                        setupListeners();
+                    } else {
+                        // Show disabled message and stop listeners
+                        document.getElementById('leaderboard-content').style.display = 'none';
+                        document.getElementById('leaderboard-disabled').style.display = 'block';
+                        stopListeners();
+                    }
+                });
                 
             } catch (error) {
                 console.error('Error initializing leaderboard:', error);
             }
         }
 
+        let teamsListener = null;
+        let adminListener = null;
+
         function setupListeners() {
-            // Listen to admin state changes
-            database.ref('admin').on('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    adminState = snapshot.val();
+            // Only set up listeners if they don't already exist
+            if (!teamsListener) {
+                teamsListener = database.ref('teams').on('value', (snapshot) => {
+                    teams = snapshot.val() || {};
+                    updateTeamsDisplay();
                     updateStats();
-                }
-            });
+                    updateLastUpdated();
+                });
+            }
             
-            // Listen to teams
-            database.ref('teams').on('value', (snapshot) => {
-                teams = snapshot.val() || {};
-                updateTeamsDisplay();
-                updateStats();
-                updateLastUpdated();
-            });
+            if (!adminListener) {
+                adminListener = database.ref('admin').on('value', (snapshot) => {
+                    if (snapshot.exists()) {
+                        adminState = snapshot.val();
+                        updateStats();
+                    }
+                });
+            }
+        }
+
+        function stopListeners() {
+            if (teamsListener) {
+                database.ref('teams').off('value', teamsListener);
+                teamsListener = null;
+            }
+            
+            if (adminListener) {
+                database.ref('admin').off('value', adminListener);
+                adminListener = null;
+            }
         }
 
         function updateTeamsDisplay() {
