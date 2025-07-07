@@ -963,6 +963,7 @@
             
             document.getElementById('results-content').innerHTML = resultsHTML;
             document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
             document.getElementById('game-controls').classList.add('hidden');
             document.getElementById('admin-waiting').classList.add('hidden');
             document.getElementById('round-results').classList.remove('hidden');
@@ -978,11 +979,22 @@
 
         async function nextRound() {
             try {
+                const tableRef = database.ref(`tables/${gameState.tableCode}`);
+                const tableSnapshot = await tableRef.once('value');
+                const tableData = tableSnapshot.val();
+                
                 // Clear round data for this table but keep teams
                 await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
-                
-                // Clear negotiation data 
                 await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
+                
+                // For shared devices, alternate the round order and reset turn
+                if (tableData && tableData.isSharedDevice) {
+                    const currentOrder = tableData.roundOrder || [1, 2];
+                    const newOrder = [currentOrder[1], currentOrder[0]]; // Reverse the order
+                    
+                    await database.ref(`tables/${gameState.tableCode}/roundOrder`).set(newOrder);
+                    await database.ref(`tables/${gameState.tableCode}/currentTurn`).set(newOrder[0]);
+                }
                 
                 // Reset calculation flag for new round
                 isCalculating = false;
@@ -992,6 +1004,7 @@
                 document.getElementById('round-results').classList.add('hidden');
                 document.getElementById('game-controls').classList.remove('hidden');
                 document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
                 
                 // Reset to negotiation phase
                 document.getElementById('contribution-phase').classList.add('hidden');
