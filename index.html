@@ -249,7 +249,7 @@
                     Opponent Registration
                     <br><small style="font-size: 12px; opacity: 0.8;">opens new tab</small>
                 </button>
-                <button class="button button-secondary" onclick="openNewTab()" style="margin-top: 10px; width: auto; padding: 8px 16px;">
+                <button class="button button-secondary" onclick="openNewTab()" id="open-new-tab-btn" style="margin-top: 10px; width: auto; padding: 8px 16px;">
                     Accidentally closed tab? Open new tab
                 </button>
                 <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
@@ -618,10 +618,14 @@
             
             // Show opponent registration button if this is a shared device table
             const opponentRegBtn = document.getElementById('opponent-registration-btn');
+            const openNewTabBtn = document.getElementById('open-new-tab-btn');
+            
             if (tableData.isSharedDevice && !tableData.teamB) {
                 opponentRegBtn.style.display = 'block';
+                openNewTabBtn.style.display = 'none'; // Hide when opponent registration is shown
             } else {
                 opponentRegBtn.style.display = 'none';
+                openNewTabBtn.style.display = 'block'; // Show when opponent registration is hidden
             }
             
             // Check if admin started a new round (no round data exists and we were showing results)
