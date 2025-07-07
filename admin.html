@@ -653,12 +653,6 @@
             try {
                 await database.ref('admin/sharedDevices').set(isSharedDevices);
                 
-                if (isSharedDevices) {
-                    alert('Shared Devices Mode enabled! Students can use shared devices at tables.');
-                } else {
-                    alert('Shared Devices Mode disabled. Students will use individual devices.');
-                }
-                
             } catch (error) {
                 console.error('Error toggling shared devices mode:', error);
                 alert('Error updating shared devices mode. Check console for details.');
@@ -670,12 +664,6 @@
             
             try {
                 await database.ref('admin/leaderboardEnabled').set(isLeaderboardEnabled);
-                
-                if (isLeaderboardEnabled) {
-                    alert('Public Leaderboard enabled! You can now project leaderboard.html');
-                } else {
-                    alert('Public Leaderboard disabled. Leaderboard page will show access denied message.');
-                }
                 
             } catch (error) {
                 console.error('Error toggling leaderboard:', error);
