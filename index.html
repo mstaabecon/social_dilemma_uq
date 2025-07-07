@@ -220,7 +220,7 @@
                 <label for="table-code">Table Code</label>
                 <input type="text" id="table-code" placeholder="Enter your table code exactly as shown">
                 <small style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 5px; display: block;">
-                    Check the code on your physical table carefully
+                    Each device comes with a unique Table Code
                 </small>
             </div>
             
@@ -246,13 +246,14 @@
                 Waiting for opponent team to join<br>
                 <small style="color: rgba(255,255,255,0.8);">Wrong table? Use the button below to try again</small><br>
                 <button class="button button-primary" onclick="openOpponentRegistration()" id="opponent-registration-btn" style="margin-top: 10px; display: none;">
-                    📱 Opponent Registration (opens new tab)
+                    Opponent Registration
+                    <br><small style="font-size: 12px; opacity: 0.8;">opens new tab</small>
                 </button>
                 <button class="button button-secondary" onclick="cancelWaiting()" style="margin-top: 10px; width: auto; padding: 8px 16px;">Cancel & Choose Different Table</button>
             </div>
             
             <div id="waiting-for-turn" class="status hidden">
-                Waiting for opponent entry - please pass device to other team and switch tab
+                Waiting for opponent - please pass device to other team and switch tab
             </div>
             
             <div id="admin-waiting" class="status admin-status hidden">
@@ -808,7 +809,7 @@
             try {
                 // Update negotiated contribution in Firebase so opponent can see it
                 const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                await database.ref(`tables/${gameState.tableCode}/negotiations/${myTeamKey}`).set({
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations/${myTeamKey}`).set({
                     amount: parseInt(negotiatedAmount),
                     timestamp: Date.now()
                 });
@@ -828,7 +829,7 @@
             try {
                 // Submit this team's data to Firebase
                 const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                const roundDataRef = database.ref(`tables/${gameState.tableCode}/roundData/${myTeamKey}`);
+                const roundDataRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData/${myTeamKey}`);
                 
                 await roundDataRef.set({
                     negotiated: negotiatedContribution,
@@ -840,7 +841,7 @@
                 document.getElementById('game-controls').classList.add('hidden');
                 
                 // For shared devices, update turn after submission
-                const tableRef = database.ref(`tables/${gameState.tableCode}`);
+                const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
                 const tableSnapshot = await tableRef.once('value');
                 const tableData = tableSnapshot.val();
                 
@@ -854,7 +855,7 @@
                     
                     if (!opponentHasSubmitted) {
                         // Switch turn to opponent
-                        await database.ref(`tables/${gameState.tableCode}/currentTurn`).set(opponentTeamNumber);
+                        await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(opponentTeamNumber);
                     }
                     // If opponent already submitted, results will be calculated automatically
                 }
@@ -979,21 +980,21 @@
 
         async function nextRound() {
             try {
-                const tableRef = database.ref(`tables/${gameState.tableCode}`);
+                const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
                 const tableSnapshot = await tableRef.once('value');
                 const tableData = tableSnapshot.val();
                 
                 // Clear round data for this table but keep teams
-                await database.ref(`tables/${gameState.tableCode}/roundData`).set({});
-                await database.ref(`tables/${gameState.tableCode}/negotiations`).set({});
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).set({});
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations`).set({});
                 
                 // For shared devices, alternate the round order and reset turn
                 if (tableData && tableData.isSharedDevice) {
                     const currentOrder = tableData.roundOrder || [1, 2];
                     const newOrder = [currentOrder[1], currentOrder[0]]; // Reverse the order
                     
-                    await database.ref(`tables/${gameState.tableCode}/roundOrder`).set(newOrder);
-                    await database.ref(`tables/${gameState.tableCode}/currentTurn`).set(newOrder[0]);
+                    await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundOrder`).set(newOrder);
+                    await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(newOrder[0]);
                 }
                 
                 // Reset calculation flag for new round
@@ -1027,14 +1028,14 @@
         async function changeTable() {
             try {
                 // Signal both teams to change tables by setting a flag
-                await database.ref(`tables/${gameState.tableCode}/changeTable`).set(true);
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/changeTable`).set(true);
                 
                 // Remove both teams from current table
-                await database.ref(`tables/${gameState.tableCode}/teamA`).remove();
-                await database.ref(`tables/${gameState.tableCode}/teamB`).remove();
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/teamA`).remove();
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/teamB`).remove();
                 
                 // Clear round data
-                await database.ref(`tables/${gameState.tableCode}/roundData`).remove();
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).remove();
                 
                 // Reset UI for table selection
                 handleForceTableReset();
@@ -1068,7 +1069,7 @@
             try {
                 // Remove this team from current table
                 const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                await database.ref(`tables/${gameState.tableCode}/${myTeamKey}`).remove();
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/${myTeamKey}`).remove();
                 
                 // Stop listening to current table
                 if (currentTableRef) {
