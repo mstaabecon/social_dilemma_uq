@@ -680,7 +680,12 @@
                 openNewTabBtn.style.display = 'none'; // Hide when opponent registration is shown
             } else {
                 opponentRegBtn.style.display = 'none';
-                openNewTabBtn.style.display = 'block'; // Show when opponent registration is hidden
+                // Only show "open new tab" button if admin has enabled shared devices mode
+                if (adminState.sharedDevices) {
+                    openNewTabBtn.style.display = 'block';
+                } else {
+                    openNewTabBtn.style.display = 'none';
+                }
             }
             
             // Check if admin started a new round (no round data exists and we were showing results)
