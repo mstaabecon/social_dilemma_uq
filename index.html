@@ -235,6 +235,13 @@
             </div>
             
             <button class="button button-primary" onclick="joinTable()">Join Table</button>
+            
+            <div style="text-align: center; margin-top: 15px;">
+                <small style="color: rgba(255,255,255,0.8); font-size: 14px;">
+                    Team not registered? 
+                    <a href="register.html" style="color: #4CAF50; text-decoration: none; font-weight: 600;">Register here</a>
+                </small>
+            </div>
         </div>
         
         <!-- Game Phase -->
@@ -531,13 +538,45 @@
                 return;
             }
             
-            gameState.teamName = teamName;
-            gameState.tableCode = tableCode;
+            console.log('Validating team:', teamName); // Debug log
             
-            // Update display
-            document.getElementById('display-team-name').textContent = teamName;
-            document.getElementById('display-table-code').textContent = tableCode;
-            
+            // Validate team name against registered teams (case-insensitive)
+            try {
+                const teamNameUpper = teamName.toUpperCase();
+                const registeredTeamsRef = database.ref('registeredTeams');
+                const snapshot = await registeredTeamsRef.child(teamNameUpper).once('value');
+                
+                console.log('Team validation result:', snapshot.exists()); // Debug log
+                
+                if (!snapshot.exists()) {
+                    console.log('Team not found in registered teams'); // Debug log
+                    showError('Team name not registered. Please register your team first or check spelling.');
+                    return;
+                }
+                
+                console.log('Team validation passed, proceeding...'); // Debug log
+                
+                // Get the original registered name to maintain consistent casing
+                const registeredTeamData = snapshot.val();
+                const originalTeamName = registeredTeamData.originalName || teamName;
+                
+                gameState.teamName = originalTeamName;
+                gameState.tableCode = tableCode;
+                
+                // Update display with original casing
+                document.getElementById('display-team-name').textContent = originalTeamName;
+                document.getElementById('display-table-code').textContent = tableCode;
+                
+                // Continue with existing join table logic...
+                await proceedWithTableJoin(originalTeamName, tableCode, isSharedDevice);
+                
+            } catch (error) {
+                console.error('Error validating team name:', error);
+                showError('Error validating team name. Please try again.');
+            }
+        }
+
+        async function proceedWithTableJoin(teamName, tableCode, isSharedDevice) {
             try {
                 // Reference to this table
                 currentTableRef = database.ref(`tables/${tableCode}`);
@@ -609,6 +648,13 @@
                 // Switch to game phase
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
+                
+                // Show appropriate team status display
+                if (isSharedDevice) {
+                    document.getElementById('shared-team-banner').classList.remove('hidden');
+                } else {
+                    document.getElementById('single-team-status').classList.remove('hidden');
+                }
                 
             } catch (error) {
                 console.error('Error joining table:', error);
