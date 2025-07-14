@@ -649,12 +649,14 @@
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
                 
-                // Show appropriate team status display
-                if (isSharedDevice) {
-                    document.getElementById('shared-team-banner').classList.remove('hidden');
-                } else {
-                    document.getElementById('single-team-status').classList.remove('hidden');
+                // Show appropriate team status display based on actual table configuration
+                const singleTeamStatus = document.getElementById('single-team-status');
+                if (singleTeamStatus) {
+                    singleTeamStatus.classList.remove('hidden');
                 }
+                
+                // Only show shared team banner if this table is actually using shared devices
+                // (this will be handled later by updateGameState when table data loads)
                 
             } catch (error) {
                 console.error('Error joining table:', error);
