@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Registration - Social Dilemma</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #51247A 0%, #663399 50%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 16px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        }
+        
+        .button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .button-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        .button-primary:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .button-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .button-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .loading {
+            text-align: center;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤝 Team Registration</h1>
+        <div class="subtitle">The Social Dilemma</div>
+        
+        <div id="error-message" class="error hidden"></div>
+        <div id="success-message" class="success hidden"></div>
+        
+        <div class="form-group">
+            <label for="team-name">Team Name</label>
+            <input type="text" id="team-name" placeholder="Enter your team name" maxlength="50">
+            <small style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 5px; display: block;">
+                Choose a unique name for your team
+            </small>
+        </div>
+        
+        <button class="button button-primary" onclick="registerTeam()" id="register-btn">
+            Register Team
+        </button>
+        
+        <button class="button button-secondary" onclick="goToGame()">
+            Already Registered? Go to Game
+        </button>
+        
+        <div id="loading" class="loading hidden">
+            Registering team...
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
+            authDomain: "social-dilemma-game.firebaseapp.com",
+            databaseURL: "https://social-dilemma-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "social-dilemma-game",
+            storageBucket: "social-dilemma-game.firebasestorage.app",
+            messagingSenderId: "579478025877",
+            appId: "1:579478025877:web:71e8a165988c8d73408d9c"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        async function registerTeam() {
+            const teamName = document.getElementById('team-name').value.trim();
+            
+            if (!teamName) {
+                showError('Please enter a team name');
+                return;
+            }
+            
+            if (teamName.length < 2) {
+                showError('Team name must be at least 2 characters long');
+                return;
+            }
+            
+            // Show loading state
+            setLoading(true);
+            
+            try {
+                // Convert to uppercase for case-insensitive storage
+                const teamNameUpper = teamName.toUpperCase();
+                
+                // Check if team name already exists
+                const registeredTeamsRef = database.ref('registeredTeams');
+                const snapshot = await registeredTeamsRef.child(teamNameUpper).once('value');
+                
+                if (snapshot.exists()) {
+                    setLoading(false);
+                    showError('Team name already taken. Please choose a different name.');
+                    return;
+                }
+                
+                // Register the team
+                await registeredTeamsRef.child(teamNameUpper).set({
+                    originalName: teamName,
+                    registeredAt: new Date().toISOString(),
+                    registeredBy: 'student'
+                });
+                
+                setLoading(false);
+                showSuccess('Team registered successfully! Redirecting to game...');
+                
+                // Redirect to game page with team name pre-filled
+                setTimeout(() => {
+                    const encodedTeamName = encodeURIComponent(teamName);
+                    window.location.href = `index.html?team=${encodedTeamName}&registered=true`;
+                }, 1500);
+                
+            } catch (error) {
+                setLoading(false);
+                console.error('Error registering team:', error);
+                showError('Error registering team. Please try again.');
+            }
+        }
+
+        function goToGame() {
+            window.location.href = 'index.html';
+        }
+
+        function setLoading(isLoading) {
+            const registerBtn = document.getElementById('register-btn');
+            const loading = document.getElementById('loading');
+            
+            if (isLoading) {
+                registerBtn.disabled = true;
+                registerBtn.textContent = 'Registering...';
+                loading.classList.remove('hidden');
+            } else {
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Register Team';
+                loading.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            successDiv.classList.add('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            successDiv.textContent = message;
+            successDiv.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('team-name').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                registerTeam();
+            }
+        });
+
+        // Make functions globally accessible
+        window.registerTeam = registerTeam;
+        window.goToGame = goToGame;
+    </script>
+</body>
+</html>
