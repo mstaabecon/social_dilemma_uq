@@ -1123,7 +1123,10 @@
         function checkURLParameters() {
             const urlParams = new URLSearchParams(window.location.search);
             const tableCode = urlParams.get('table');
+            const teamName = urlParams.get('team');
+            const isRegistered = urlParams.get('registered');
             
+            // Handle table code pre-fill (for opponent registration)
             if (tableCode) {
                 // Pre-fill the table code field
                 document.getElementById('table-code').value = tableCode.toUpperCase();
@@ -1170,6 +1173,33 @@
                 }).catch((error) => {
                     console.error('Error checking table shared device status:', error);
                 });
+            }
+            
+            // Handle team name pre-fill (from registration)
+            if (teamName && isRegistered) {
+                // Pre-fill the team name field
+                document.getElementById('team-name').value = teamName;
+                
+                // Add visual indication that registration was successful
+                const teamInput = document.getElementById('team-name');
+                teamInput.style.background = 'rgba(76, 175, 80, 0.2)';
+                teamInput.style.border = '2px solid #4CAF50';
+                teamInput.readOnly = true; // Prevent editing of registered name
+                
+                // Add success message
+                const teamGroup = teamInput.parentElement;
+                const successText = document.createElement('small');
+                successText.style.color = '#4CAF50';
+                successText.style.fontSize = '14px';
+                successText.style.display = 'block';
+                successText.style.marginTop = '5px';
+                successText.textContent = '✓ Team registration successful!';
+                teamGroup.appendChild(successText);
+                
+                // Focus on table code field since team name is filled
+                setTimeout(() => {
+                    document.getElementById('table-code').focus();
+                }, 100);
             }
         }
 
