@@ -384,36 +384,35 @@
             initialBudget: DEFAULT_INITIAL_BUDGET
         };
 
-        // Initialize admin listener
-        function initializeAdminListener() {
-            adminRef = database.ref('admin');
-            adminRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    const previousResetTimestamp = adminState.resetTimestamp || 0;
-                    adminState = data;
-                    
-                    // Ensure we have an initial budget set
-                    if (!adminState.initialBudget) {
-                        adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
-                    }
-                    
-                    updateRoundDisplay();
-                    
-                    // Check if admin performed a reset
-                    if (adminState.resetTimestamp && adminState.resetTimestamp > previousResetTimestamp) {
-                        if (adminState.forceTableReset) {
-                            handleAdminReset(); // Full kick to join screen
-                        }
-                        else{
-                            handleAdminStateChange();
-                        }
-                    } else {
-                        handleAdminStateChange();
-                    }
+ function initializeAdminListener() {
+    adminRef = database.ref('admin');
+    adminRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            const previousResetTimestamp = adminState.resetTimestamp || 0;
+            adminState = data;
+
+            if (!adminState.initialBudget) {
+                adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
+            }
+
+            updateRoundDisplay();
+
+            if (
+                adminState.resetTimestamp &&
+                adminState.resetTimestamp > previousResetTimestamp
+            ) {
+                if (adminState.forceTableReset) {
+                    handleAdminReset(); // Full reset only when needed
+                } else {
+                    handleAdminStateChange(); // Normal round update
                 }
-            });
+            } else {
+                handleAdminStateChange();
+            }
         }
+    });
+}
 
         function getInitialBudget() {
             return adminState.initialBudget || DEFAULT_INITIAL_BUDGET;
