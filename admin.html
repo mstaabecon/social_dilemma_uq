@@ -412,9 +412,6 @@
         <!-- Admin Actions -->
         <div class="admin-actions">
             <div class="controlled-only">
-                <button class="button button-primary" onclick="toggleGameState()" id="toggle-game-btn">
-                    Start Game
-                </button>
                 <button class="button button-primary" onclick="toggleResultsDisplay()" id="toggle-results-btn">
                     Show Results to Students
                 </button>
@@ -488,8 +485,7 @@
             sharedDevices: false,
             leaderboardEnabled: false,
             resetTimestamp: Date.now(),
-            initialBudget: INITIAL_BUDGET,
-            gameActive: false // New field for game state control
+            initialBudget: INITIAL_BUDGET // Store configurable initial budget
         };
 
         let tables = {};
@@ -593,37 +589,24 @@
             document.getElementById('results-status').textContent = adminState.showResults ? 'Visible' : 'Hidden';
             
             // Update button states
-            const toggleGameBtn = document.getElementById('toggle-game-btn');
             const toggleResultsBtn = document.getElementById('toggle-results-btn');
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                // Update game state button
-                if (adminState.gameActive) {
-                    toggleGameBtn.textContent = 'Pause Game';
-                    toggleGameBtn.className = 'button button-warning';
-                } else {
-                    toggleGameBtn.textContent = 'Start Game';
-                    toggleGameBtn.className = 'button button-primary';
-                }
-                
-                // Update other buttons based on game state
-                if (adminState.gameActive) {
-                    toggleResultsBtn.disabled = false;
-                    nextRoundBtn.disabled = false;
-                    
-                    if (!adminState.showResults) {
-                        toggleResultsBtn.textContent = 'Show Results to Students';
-                        toggleResultsBtn.className = 'button button-primary';
-                    } else {
-                        toggleResultsBtn.textContent = 'Hide Results from Students';
-                        toggleResultsBtn.className = 'button button-warning';
-                    }
-                } else {
-                    toggleResultsBtn.disabled = true;
+                if (!adminState.showResults) {
+                    // Results are hidden
                     toggleResultsBtn.textContent = 'Show Results to Students';
+                    toggleResultsBtn.disabled = false;
                     toggleResultsBtn.className = 'button button-primary';
-                    nextRoundBtn.disabled = true;
+                    nextRoundBtn.textContent = 'Start Next Round';
+                    nextRoundBtn.disabled = false;
+                } else {
+                    // Results are visible
+                    toggleResultsBtn.textContent = 'Hide Results from Students';
+                    toggleResultsBtn.disabled = false;
+                    toggleResultsBtn.className = 'button button-warning';
+                    nextRoundBtn.textContent = 'Start Next Round';
+                    nextRoundBtn.disabled = false;
                 }
             }
         }
@@ -745,23 +728,7 @@
         }
 
         // Admin Functions
-        async function toggleGameState() {
-            try {
-                const newGameState = !adminState.gameActive;
-                
-                await database.ref('admin/gameActive').set(newGameState);
-                
-                if (newGameState) {
-                    alert('Game is now ACTIVE! Teams can start playing rounds.');
-                } else {
-                    alert('Game is now PAUSED! Teams can register and pair up but cannot start playing.');
-                }
-                
-            } catch (error) {
-                console.error('Error toggling game state:', error);
-                alert('Error toggling game state. Check console for details.');
-            }
-        }
+        async function changeControlMode() {
             const selectedMode = document.querySelector('input[name="mode"]:checked').value;
             
             try {
@@ -1131,7 +1098,6 @@
         window.changeControlMode = changeControlMode;
         window.toggleSharedDevices = toggleSharedDevices;
         window.toggleLeaderboard = toggleLeaderboard;
-        window.toggleGameState = toggleGameState;
         window.toggleResultsDisplay = toggleResultsDisplay;
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
