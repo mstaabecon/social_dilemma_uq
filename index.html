@@ -235,6 +235,11 @@
                 </button>
             </div>
             
+            <div id="game-waiting" class="status admin-status hidden">
+                <strong>Waiting for game to start...</strong><br>
+                <span id="game-waiting-message">The instructor will start the game soon. You can register and find a partner while waiting.</span>
+            </div>
+            
             <div id="admin-waiting" class="status admin-status hidden">
                 <strong>Waiting for instructor...</strong><br>
                 <span id="admin-message">The instructor will start the next round soon.</span>
@@ -381,7 +386,8 @@
             currentRound: 1, 
             showResults: false,
             resetTimestamp: 0,
-            initialBudget: DEFAULT_INITIAL_BUDGET
+            initialBudget: DEFAULT_INITIAL_BUDGET,
+            gameActive: false
         };
 
         // Initialize admin listener
@@ -553,15 +559,32 @@
 
         function handleControlledMode() {
             const adminWaiting = document.getElementById('admin-waiting');
+            const gameWaiting = document.getElementById('game-waiting');
             const nextRoundBtn = document.getElementById('next-round-btn');
             const adminMessage = document.getElementById('admin-message');
+            const gameControls = document.getElementById('game-controls');
 
-            if (adminState.controlMode === 'controlled' && showingResults) {
-                adminWaiting.classList.remove('hidden');
-                adminMessage.textContent = 'Waiting for instructor to start the next round';
+            if (adminState.controlMode === 'controlled') {
+                // Check if game is active
+                if (!adminState.gameActive) {
+                    // Game is paused - teams can pair but not play
+                    gameControls.classList.add('hidden');
+                    adminWaiting.classList.add('hidden');
+                    gameWaiting.classList.remove('hidden');
+                    return;
+                } else {
+                    // Game is active - hide game waiting message
+                    gameWaiting.classList.add('hidden');
+                }
                 
-                if (nextRoundBtn) {
-                    nextRoundBtn.style.display = 'none';
+                // Original controlled mode logic for when game is active
+                if (showingResults) {
+                    adminWaiting.classList.remove('hidden');
+                    adminMessage.textContent = 'Waiting for instructor to start the next round';
+                    
+                    if (nextRoundBtn) {
+                        nextRoundBtn.style.display = 'none';
+                    }
                 }
             }
         }
@@ -755,6 +778,14 @@
             if (tableData.teamA && tableData.teamB) {
                 document.getElementById('waiting-for-opponent').classList.add('hidden');
                 
+                // In controlled mode, check if game is active before allowing play
+                if (adminState.controlMode === 'controlled' && !adminState.gameActive) {
+                    document.getElementById('game-controls').classList.add('hidden');
+                    document.getElementById('game-waiting').classList.remove('hidden');
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    return;
+                }
+                
                 // For shared devices, handle turn-based play
                 if (tableData.isSharedDevice) {
                     handleSharedDeviceTurns(tableData);
@@ -765,6 +796,7 @@
             } else {
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('game-waiting').classList.add('hidden');
             }
         }
 
