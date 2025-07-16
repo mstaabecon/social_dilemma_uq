@@ -401,8 +401,13 @@
                     updateRoundDisplay();
                     
                     // Check if admin performed a reset
-                    if (adminState.forceTableReset && adminState.resetTimestamp > previousResetTimestamp) {
-                        handleAdminReset();
+                    if (adminState.resetTimestamp && adminState.resetTimestamp > previousResetTimestamp) {
+                        if (adminState.forceTableReset) {
+                            handleAdminReset(); // Full kick to join screen
+                        }
+                        else{
+                            handleAdminStateChange();
+                        }
                     } else {
                         handleAdminStateChange();
                     }
@@ -531,7 +536,7 @@
                         currentTableRef.once('value').then((snapshot) => {
                             const tableData = snapshot.val();
                             if (tableData && tableData.roundData && 
-                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
+                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating && !tableData.resultsProcessed) {
                                 isCalculating = true;
                                 calculateResults(tableData);
                             }
