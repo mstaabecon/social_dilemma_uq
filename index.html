@@ -96,43 +96,6 @@
             border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
-        .choice-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .choice-button {
-            flex: 1;
-            padding: 20px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .choice-black {
-            background: #2c3e50;
-            color: white;
-        }
-        
-        .choice-red {
-            background: #e74c3c;
-            color: white;
-        }
-        
-        .choice-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        
-        .choice-button.selected {
-            transform: scale(1.05);
-            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
-        }
-        
         .status {
             text-align: center;
             padding: 20px;
@@ -411,14 +374,21 @@
             tableCode: '',
             budget: 500,
             selectedChoice: null,
-            isTeamA: false
+            isTeamA: false,
+            lastResetTimestamp: 0 // Track last reset to detect admin resets
         };
 
         let currentTableRef = null;
         let adminRef = null;
         let isCalculating = false;
         let showingResults = false;
-        let adminState = { controlMode: 'free', allowNewRounds: true, currentRound: 1, showResults: false };
+        let adminState = { 
+            controlMode: 'free', 
+            allowNewRounds: true, 
+            currentRound: 1, 
+            showResults: false,
+            resetTimestamp: 0
+        };
 
         // Initialize admin listener
         function initializeAdminListener() {
@@ -426,11 +396,69 @@
             adminRef.on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
+                    const previousResetTimestamp = adminState.resetTimestamp || 0;
                     adminState = data;
                     updateRoundDisplay();
-                    handleAdminStateChange();
+                    
+                    // Check if admin performed a reset
+                    if (adminState.resetTimestamp && adminState.resetTimestamp > previousResetTimestamp) {
+                        handleAdminReset();
+                    } else {
+                        handleAdminStateChange();
+                    }
                 }
             });
+        }
+
+        function handleAdminReset() {
+            console.log('Admin reset detected, forcing fresh start');
+            
+            // Store the new reset timestamp
+            gameState.lastResetTimestamp = adminState.resetTimestamp;
+            
+            // Force complete UI reset
+            resetToInitialState();
+            
+            // Show reset message
+            showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+        }
+
+        function resetToInitialState() {
+            // Stop listening to old table
+            if (currentTableRef) {
+                currentTableRef.off();
+                currentTableRef = null;
+            }
+
+            // Reset all game state flags
+            isCalculating = false;
+            showingResults = false;
+            gameState.selectedChoice = null;
+            
+            // Reset UI to setup phase
+            document.getElementById('game-phase').classList.add('hidden');
+            document.getElementById('setup-phase').classList.remove('hidden');
+            
+            // Clear form fields
+            document.getElementById('table-code').value = '';
+            
+            // Reset all game UI elements
+            document.getElementById('round-results').classList.add('hidden');
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('waiting-for-opponent').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+            
+            // Reset negotiation and contribution phases
+            document.getElementById('contribution-phase').classList.add('hidden');
+            document.getElementById('negotiation-phase').classList.remove('hidden');
+            
+            // Reset displays
+            document.getElementById('my-negotiated').textContent = '--';
+            document.getElementById('opponent-negotiated').textContent = '--';
+            document.getElementById('negotiated-contribution').value = '0';
+            document.getElementById('actual-contribution').value = '0';
         }
 
         function updateRoundDisplay() {
@@ -456,7 +484,6 @@
             
             if (adminState.sharedDevices) {
                 sharedDeviceOption.style.display = 'block';
-                // Check the toggle by default when admin enables shared device mode
                 sharedDeviceCheckbox.checked = true;
             } else {
                 sharedDeviceOption.style.display = 'none';
@@ -469,13 +496,11 @@
                 
                 // Check if admin just enabled results display and we have complete round data
                 if (adminState.showResults && !showingResults) {
-                    // Get current table data to check if we should show results
                     if (currentTableRef) {
                         currentTableRef.once('value').then((snapshot) => {
                             const tableData = snapshot.val();
                             if (tableData && tableData.roundData && 
                                 tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
-                                // We have complete data and admin enabled results - show them now
                                 isCalculating = true;
                                 calculateResults(tableData);
                             }
@@ -488,26 +513,8 @@
         }
 
         function handleForceTableReset() {
-            // Force return to table selection
-            document.getElementById('game-phase').classList.add('hidden');
-            document.getElementById('setup-phase').classList.remove('hidden');
-            
-            // Clear current table
-            document.getElementById('table-code').value = '';
-            
-            // Show message
+            resetToInitialState();
             showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
-            
-            // Stop listening to old table
-            if (currentTableRef) {
-                currentTableRef.off();
-                currentTableRef = null;
-            }
-
-            // Reset game state
-            gameState.selectedChoice = null;
-            showingResults = false;
-            isCalculating = false;
         }
 
         function handleControlledMode() {
@@ -516,12 +523,9 @@
             const adminMessage = document.getElementById('admin-message');
 
             if (adminState.controlMode === 'controlled' && showingResults) {
-                // Always show waiting message and hide next round button in controlled mode
-                // Students can only advance when admin starts next round (which auto-resets them)
                 adminWaiting.classList.remove('hidden');
                 adminMessage.textContent = 'Waiting for instructor to start the next round';
                 
-                // Always hide next round button in controlled mode
                 if (nextRoundBtn) {
                     nextRoundBtn.style.display = 'none';
                 }
@@ -538,36 +542,25 @@
                 return;
             }
             
-            console.log('Validating team:', teamName); // Debug log
-            
-            // Validate team name against registered teams (case-insensitive)
             try {
                 const teamNameUpper = teamName.toUpperCase();
                 const registeredTeamsRef = database.ref('registeredTeams');
                 const snapshot = await registeredTeamsRef.child(teamNameUpper).once('value');
                 
-                console.log('Team validation result:', snapshot.exists()); // Debug log
-                
                 if (!snapshot.exists()) {
-                    console.log('Team not found in registered teams'); // Debug log
                     showError('Team name not registered. Please register your team first or check spelling.');
                     return;
                 }
                 
-                console.log('Team validation passed, proceeding...'); // Debug log
-                
-                // Get the original registered name to maintain consistent casing
                 const registeredTeamData = snapshot.val();
                 const originalTeamName = registeredTeamData.originalName || teamName;
                 
                 gameState.teamName = originalTeamName;
                 gameState.tableCode = tableCode;
                 
-                // Update display with original casing
                 document.getElementById('display-team-name').textContent = originalTeamName;
                 document.getElementById('display-table-code').textContent = tableCode;
                 
-                // Continue with existing join table logic...
                 await proceedWithTableJoin(originalTeamName, tableCode, isSharedDevice);
                 
             } catch (error) {
@@ -578,10 +571,8 @@
 
         async function proceedWithTableJoin(teamName, tableCode, isSharedDevice) {
             try {
-                // Reference to this table
                 currentTableRef = database.ref(`tables/${tableCode}`);
                 
-                // Get existing table data
                 const tableSnapshot = await currentTableRef.once('value');
                 let tableData = tableSnapshot.val() || {
                     teamA: null,
@@ -590,9 +581,23 @@
                     status: 'waiting'
                 };
                 
+                // IMPORTANT: Check if this table has stale data from before the last reset
+                if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
+                    // This table has stale data from before the reset - clear it completely
+                    console.log('Clearing stale table data from before reset');
+                    tableData = {
+                        teamA: null,
+                        teamB: null,
+                        roundData: {},
+                        status: 'waiting',
+                        createdAfterReset: Date.now() // Mark when this fresh table was created
+                    };
+                }
+                
                 // Set shared device flag if this is the first team to join
                 if (!tableData.teamA && !tableData.teamB) {
                     tableData.isSharedDevice = isSharedDevice;
+                    tableData.createdAfterReset = Date.now(); // Mark as fresh
                     // Initialize turn tracking for shared devices
                     if (isSharedDevice) {
                         tableData.currentTurn = 1;
@@ -649,15 +654,6 @@
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
                 
-                // Show appropriate team status display based on actual table configuration
-                const singleTeamStatus = document.getElementById('single-team-status');
-                if (singleTeamStatus) {
-                    singleTeamStatus.classList.remove('hidden');
-                }
-                
-                // Only show shared team banner if this table is actually using shared devices
-                // (this will be handled later by updateGameState when table data loads)
-                
             } catch (error) {
                 console.error('Error joining table:', error);
                 showError('Error joining table. Please try again.');
@@ -671,16 +667,22 @@
                 return;
             }
             
+            // Check if this table has been reset and needs fresh start
+            if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
+                console.log('Table data is stale, forcing reset');
+                handleForceTableReset();
+                return;
+            }
+            
             // Show opponent registration button if this is a shared device table
             const opponentRegBtn = document.getElementById('opponent-registration-btn');
             const openNewTabBtn = document.getElementById('open-new-tab-btn');
             
             if (tableData.isSharedDevice && !tableData.teamB) {
                 opponentRegBtn.style.display = 'block';
-                openNewTabBtn.style.display = 'none'; // Hide when opponent registration is shown
+                openNewTabBtn.style.display = 'none';
             } else {
                 opponentRegBtn.style.display = 'none';
-                // Only show "open new tab" button if admin has enabled shared devices mode
                 if (adminState.sharedDevices) {
                     openNewTabBtn.style.display = 'block';
                 } else {
@@ -693,25 +695,7 @@
                 (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && 
                 showingResults) {
                 // Admin cleared the round data - reset to play new round
-                isCalculating = false;
-                showingResults = false;
-                
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
-                
-                // Reset to negotiation phase
-                document.getElementById('contribution-phase').classList.add('hidden');
-                document.getElementById('negotiation-phase').classList.remove('hidden');
-                
-                // Reset negotiated displays
-                document.getElementById('my-negotiated').textContent = '--';
-                document.getElementById('opponent-negotiated').textContent = '--';
-                
-                // Reset dropdowns
-                document.getElementById('negotiated-contribution').value = '0';
-                document.getElementById('actual-contribution').value = '0';
+                resetForNewRound();
             }
             
             document.getElementById('my-budget').textContent = gameState.budget;
@@ -766,6 +750,28 @@
                 document.getElementById('waiting-for-opponent').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
             }
+        }
+
+        function resetForNewRound() {
+            isCalculating = false;
+            showingResults = false;
+            
+            document.getElementById('round-results').classList.add('hidden');
+            document.getElementById('game-controls').classList.remove('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            
+            // Reset to negotiation phase
+            document.getElementById('contribution-phase').classList.add('hidden');
+            document.getElementById('negotiation-phase').classList.remove('hidden');
+            
+            // Reset negotiated displays
+            document.getElementById('my-negotiated').textContent = '--';
+            document.getElementById('opponent-negotiated').textContent = '--';
+            
+            // Reset dropdowns
+            document.getElementById('negotiated-contribution').value = '0';
+            document.getElementById('actual-contribution').value = '0';
         }
 
         function handleSharedDeviceTurns(tableData) {
@@ -1058,6 +1064,7 @@
                 // Clear round data for this table but keep teams
                 await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).set({});
                 await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations`).set({});
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/resultsProcessed`).set(null);
                 
                 // For shared devices, alternate the round order and reset turn
                 if (tableData && tableData.isSharedDevice) {
@@ -1068,27 +1075,8 @@
                     await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(newOrder[0]);
                 }
                 
-                // Reset calculation flag for new round
-                isCalculating = false;
-                showingResults = false;
-                
-                // Reset UI for new round at same table
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
-                
-                // Reset to negotiation phase
-                document.getElementById('contribution-phase').classList.add('hidden');
-                document.getElementById('negotiation-phase').classList.remove('hidden');
-                
-                // Reset negotiated displays
-                document.getElementById('my-negotiated').textContent = '--';
-                document.getElementById('opponent-negotiated').textContent = '--';
-                
-                // Reset dropdowns to first option
-                document.getElementById('negotiated-contribution').value = '0';
-                document.getElementById('actual-contribution').value = '0';
+                // Reset for new round
+                resetForNewRound();
                 
             } catch (error) {
                 console.error('Error starting new round:', error);
@@ -1155,10 +1143,7 @@
                 }
                 
                 // Reset UI for table selection
-                document.getElementById('game-phase').classList.add('hidden');
-                document.getElementById('setup-phase').classList.remove('hidden');
-                document.getElementById('table-code').value = '';
-                
+                resetToInitialState();
                 showError('Cancelled - you can now select a different table');
                 
             } catch (error) {

@@ -414,8 +414,9 @@
             processingResults: false,
             forceTableReset: false,
             adminPassword: 'admin123',
-            sharedDevices: false, // New: controls whether tables use shared devices
-            leaderboardEnabled: false // New: controls whether leaderboard is visible
+            sharedDevices: false,
+            leaderboardEnabled: false,
+            resetTimestamp: Date.now() // Add reset timestamp to track when resets occur
         };
 
         let tables = {};
@@ -702,7 +703,6 @@
                             updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
                             
                             // Only increment rounds if this is a new round for the team
-                            // Check if team's round count is less than current admin round
                             const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
                             const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
                             const currentAdminRound = adminState.currentRound || 1;
@@ -748,12 +748,22 @@
                 for (let tableCode in tables) {
                     updates[`tables/${tableCode}/roundData`] = null;
                     updates[`tables/${tableCode}/negotiations`] = null;
+                    updates[`tables/${tableCode}/resultsProcessed`] = null;
+                    
+                    // Reset shared device turn tracking if applicable
+                    if (tables[tableCode].isSharedDevice) {
+                        // Randomize starting order for new round
+                        const randomOrder = Math.random() < 0.5 ? [1, 2] : [2, 1];
+                        updates[`tables/${tableCode}/roundOrder`] = randomOrder;
+                        updates[`tables/${tableCode}/currentTurn`] = randomOrder[0];
+                    }
                 }
                 
                 // Update admin state for new round
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
-                updates['admin/showResults'] = false; // Hide results for new round
+                updates['admin/showResults'] = false;
                 updates['admin/allowNewRounds'] = true;
+                updates['admin/resetTimestamp'] = Date.now(); // Track when round was reset
                 
                 await database.ref().update(updates);
                 
@@ -766,26 +776,43 @@
         }
 
         async function resetAllTables() {
-            if (!confirm('This will remove all teams from tables and force them to find new partners. Continue?')) {
+            if (!confirm('This will remove all teams from tables and force them to find new partners. All round data will be cleared. Continue?')) {
                 return;
             }
             
             try {
-                // Set force reset flag
-                await database.ref('admin/forceTableReset').set(true);
+                const resetTimestamp = Date.now();
                 
-                // Clear all tables
+                // Set force reset flag with timestamp
+                await database.ref('admin/forceTableReset').set(true);
+                await database.ref('admin/resetTimestamp').set(resetTimestamp);
+                
+                // Clear ALL table data completely
                 await database.ref('tables').set({});
                 
-                // Reset phase
-                await database.ref('admin/currentPhase').set('playing');
+                // Clear current table references from all teams
+                const teamsUpdate = {};
+                for (let teamName in teams) {
+                    teamsUpdate[`teams/${teamName}/currentTable`] = null;
+                }
                 
-                // Reset the force flag after a brief delay
+                if (Object.keys(teamsUpdate).length > 0) {
+                    await database.ref().update(teamsUpdate);
+                }
+                
+                // Reset admin state
+                await database.ref().update({
+                    'admin/currentPhase': 'playing',
+                    'admin/showResults': false,
+                    'admin/processingResults': false
+                });
+                
+                // Reset the force flag after a delay
                 setTimeout(async () => {
                     await database.ref('admin/forceTableReset').set(false);
-                }, 2000);
+                }, 3000);
                 
-                alert('All tables reset! Teams must now re-pair.');
+                alert('All tables completely reset! Teams must now re-pair.');
                 
             } catch (error) {
                 console.error('Error resetting tables:', error);
