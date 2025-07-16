@@ -401,7 +401,7 @@
                     updateRoundDisplay();
                     
                     // Check if admin performed a reset
-                    if (adminState.resetTimestamp && adminState.resetTimestamp > previousResetTimestamp) {
+                    if (adminState.forceTableReset && adminState.resetTimestamp > previousResetTimestamp) {
                         handleAdminReset();
                     } else {
                         handleAdminStateChange();
