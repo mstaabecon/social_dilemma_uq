@@ -876,7 +876,7 @@
         }
 
         async function resetAllTables() {
-            if (!confirm('This will remove all teams from tables and force them to find new partners. All round data will be cleared. Continue?')) {
+            if (!confirm('This will remove all teams from tables and force them to find new partners. All round data will be cleared and a new round will start. Continue?')) {
                 return;
             }
             
@@ -900,8 +900,12 @@
                     await database.ref().update(teamsUpdate);
                 }
                 
-                // Reset admin state
+                // Start new round automatically (increment round number)
+                const newRound = (adminState.currentRound || 1) + 1;
+                
+                // Reset admin state with new round
                 await database.ref().update({
+                    'admin/currentRound': newRound,
                     'admin/currentPhase': 'playing',
                     'admin/showResults': false,
                     'admin/processingResults': false
@@ -912,7 +916,7 @@
                     await database.ref('admin/forceTableReset').set(false);
                 }, 3000);
                 
-                alert('All tables completely reset! Teams must now re-pair.');
+                alert(`All tables completely reset! Teams must now re-pair for Round ${newRound}.`);
                 
             } catch (error) {
                 console.error('Error resetting tables:', error);
