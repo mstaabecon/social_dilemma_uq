@@ -1079,8 +1079,18 @@ async function calculateResults(tableData) {
         const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
         const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
         
-        updates[`teams/${tableData.teamA.name}/totalRounds`] = (teamASnapshot.val() || 0) + 1;
-        updates[`teams/${tableData.teamB.name}/totalRounds`] = (teamBSnapshot.val() || 0) + 1;
+        // Round update
+        const currentRound = adminState.currentRound || 1;
+        const teamACurrentRounds = teamASnapshot.val() || 0;
+        const teamBCurrentRounds = teamBSnapshot.val() || 0;
+
+        // Only update if this is a new round for the team
+        if (teamACurrentRounds < currentRound) {
+            updates[`teams/${tableData.teamA.name}/totalRounds`] = currentRound;
+        }
+        if (teamBCurrentRounds < currentRound) {
+            updates[`teams/${tableData.teamB.name}/totalRounds`] = currentRound;
+        }
         
         await database.ref().update(updates);
         
