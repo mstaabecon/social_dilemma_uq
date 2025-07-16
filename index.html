@@ -710,10 +710,14 @@
             }
             
             // Check if this table has been reset and needs fresh start
-            if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
-                console.log('Table data is stale, forcing reset');
-                handleForceTableReset();
-                return;
+            if (
+            adminState.forceTableReset &&
+            adminState.resetTimestamp &&
+            (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)
+            ) {
+            console.log('Forced table reset triggered');
+            handleForceTableReset();
+            return;
             }
             
             // Show opponent registration button if this is a shared device table
