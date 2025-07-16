@@ -106,17 +106,13 @@
         
         .team-item.rank-1 {
             border-color: #FFD700;
-            background: rgba(255, 215, 0, 0.1);
+            background: rgba(255, 215, 0, 0.15);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
         
-        .team-item.rank-2 {
-            border-color: #C0C0C0;
-            background: rgba(192, 192, 192, 0.1);
-        }
-        
-        .team-item.rank-3 {
-            border-color: #CD7F32;
-            background: rgba(205, 127, 50, 0.1);
+        .team-item.random-prize {
+            border-color: #9C27B0;
+            background: rgba(156, 39, 176, 0.1);
         }
         
         .team-info {
@@ -136,12 +132,8 @@
             color: #FFD700;
         }
         
-        .team-rank.rank-2 {
-            color: #C0C0C0;
-        }
-        
-        .team-rank.rank-3 {
-            color: #CD7F32;
+        .team-rank.random-prize {
+            color: #9C27B0;
         }
         
         .team-name {
@@ -241,6 +233,13 @@
         <!-- Team Rankings -->
         <div class="teams-list">
             <h3>🏆 Team Rankings</h3>
+            
+            <!-- Prize Winners Display (only when finalized) -->
+            <div id="prize-winners" class="teams-list" style="display: none; margin-bottom: 30px; background: rgba(255, 215, 0, 0.1); border: 2px solid #FFD700;">
+                <h3 style="color: #FFD700;">🎉 Prize Winners</h3>
+                <div id="prize-winners-content"></div>
+            </div>
+            
             <div id="teams-container">
                 <div class="empty-state">No teams have joined yet</div>
             </div>
@@ -371,6 +370,14 @@
             // Sort teams by budget (descending) - same as admin interface
             teamsList.sort(([,a], [,b]) => (b.budget || defaultBudget) - (a.budget || defaultBudget));
             
+            // Check if scores have been finalized
+            const isFinalized = adminState.gameFinalized;
+            const firstPlaceWinner = adminState.firstPlaceWinner;
+            const randomPrizeWinner = adminState.randomPrizeWinner;
+            
+            // Update prize winners display
+            updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, randomPrizeWinner);
+            
             let html = '';
             let currentRank = 1;
             let previousBudget = null;
@@ -383,14 +390,39 @@
                     currentRank = index + 1;
                 }
                 
-                const rankClass = currentRank <= 3 ? `rank-${currentRank}` : '';
-                const itemClass = currentRank <= 3 ? `rank-${currentRank}` : '';
-                const trophy = currentRank === 1 ? '🥇' : currentRank === 2 ? '🥈' : currentRank === 3 ? '🥉' : '';
+                // Determine styling based on finalization status
+                let itemClass = '';
+                let rankClass = '';
+                let displayRank = currentRank;
+                let trophy = '';
+                
+                if (isFinalized) {
+                    if (teamName === firstPlaceWinner) {
+                        itemClass = 'rank-1';
+                        rankClass = 'rank-1';
+                        trophy = '🥇';
+                        displayRank = '1st';
+                    } else if (teamName === randomPrizeWinner) {
+                        itemClass = 'random-prize';
+                        rankClass = 'random-prize';
+                        trophy = '🎲';
+                        displayRank = 'Prize';
+                    } else {
+                        displayRank = currentRank;
+                    }
+                } else {
+                    // Before finalization, only highlight #1
+                    if (currentRank === 1) {
+                        itemClass = 'rank-1';
+                        rankClass = 'rank-1';
+                        trophy = '🥇';
+                    }
+                }
                 
                 html += `
                     <div class="team-item ${itemClass}">
                         <div class="team-info">
-                            <div class="team-rank ${rankClass}">${trophy}${currentRank}</div>
+                            <div class="team-rank ${rankClass}">${trophy}${displayRank}</div>
                             <div class="team-name">${teamName}</div>
                         </div>
                         <div class="team-stats">
@@ -404,6 +436,31 @@
             });
             
             container.innerHTML = html;
+        }
+
+        function updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, randomPrizeWinner) {
+            const prizeWinnersDiv = document.getElementById('prize-winners');
+            const prizeContent = document.getElementById('prize-winners-content');
+            
+            if (isFinalized && firstPlaceWinner && randomPrizeWinner) {
+                prizeContent.innerHTML = `
+                    <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px; padding: 10px;">
+                        <div style="text-align: center; background: rgba(255, 215, 0, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 24px; margin-bottom: 5px;">🥇</div>
+                            <div style="font-weight: bold; font-size: 18px; color: #FFD700;">First Place</div>
+                            <div style="font-size: 16px; margin-top: 5px;">${firstPlaceWinner}</div>
+                        </div>
+                        <div style="text-align: center; background: rgba(156, 39, 176, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 24px; margin-bottom: 5px;">🎲</div>
+                            <div style="font-weight: bold; font-size: 18px; color: #9C27B0;">Random Prize</div>
+                            <div style="font-size: 16px; margin-top: 5px;">${randomPrizeWinner}</div>
+                        </div>
+                    </div>
+                `;
+                prizeWinnersDiv.style.display = 'block';
+            } else {
+                prizeWinnersDiv.style.display = 'none';
+            }
         }
 
         function updateStats() {
