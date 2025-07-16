@@ -136,12 +136,34 @@
             text-align: center;
             opacity: 0.8;
         }
+        
+        .budget-info {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .budget-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🤝 The Social Dilemma</h1>
         <div class="subtitle">Team Registration</div>
+        
+        <!-- Budget Info Display -->
+        <div id="budget-info" class="budget-info hidden">
+            <div>Starting Budget</div>
+            <div class="budget-amount" id="budget-display">1000</div>
+            <small style="opacity: 0.8;">Each team starts with this amount</small>
+        </div>
         
         <div id="error-message" class="error hidden"></div>
         <div id="success-message" class="success hidden"></div>
@@ -172,6 +194,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
+        // Game Configuration
+        const DEFAULT_INITIAL_BUDGET = 1000; // Fallback if admin hasn't set one
+        
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
@@ -186,6 +211,26 @@
         // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+
+        let adminState = {
+            initialBudget: DEFAULT_INITIAL_BUDGET
+        };
+
+        // Initialize and listen for admin budget changes
+        function initializeBudgetDisplay() {
+            const adminRef = database.ref('admin');
+            adminRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    adminState = data;
+                    const budget = adminState.initialBudget || DEFAULT_INITIAL_BUDGET;
+                    
+                    // Update budget display
+                    document.getElementById('budget-display').textContent = budget;
+                    document.getElementById('budget-info').classList.remove('hidden');
+                }
+            });
+        }
 
         async function registerTeam() {
             const teamName = document.getElementById('team-name').value.trim();
@@ -286,6 +331,11 @@
             if (event.key === 'Enter') {
                 registerTeam();
             }
+        });
+
+        // Initialize budget display when page loads
+        window.addEventListener('load', () => {
+            initializeBudgetDisplay();
         });
 
         // Make functions globally accessible

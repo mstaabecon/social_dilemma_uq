@@ -246,12 +246,12 @@
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="text-align: center; flex: 1;">
                             <div style="font-size: 14px; opacity: 0.8;">Your Budget</div>
-                            <div style="font-size: 20px; font-weight: bold;"><span id="my-budget">500</span></div>
+                            <div style="font-size: 20px; font-weight: bold;"><span id="my-budget">1000</span></div>
                         </div>
                         <div style="font-size: 24px; opacity: 0.6;">vs</div>
                         <div style="text-align: center; flex: 1;">
                             <div style="font-size: 14px; opacity: 0.8;">Opponent Budget</div>
-                            <div style="font-size: 20px; font-weight: bold;"><span id="opponent-budget">500</span></div>
+                            <div style="font-size: 20px; font-weight: bold;"><span id="opponent-budget">1000</span></div>
                         </div>
                     </div>
                 </div>
@@ -277,12 +277,7 @@
                             visible to opponent
                             </small>
                             <select id="negotiated-contribution" onchange="updateNegotiatedContribution()">
-                                <option value="0">0</option>
-                                <option value="100">100</option>
-                                <option value="200">200</option>
-                                <option value="300">300</option>
-                                <option value="400">400</option>
-                                <option value="500">500</option>
+                                <!-- Options will be populated dynamically based on budget -->
                             </select>
                         </div>
                         
@@ -312,12 +307,7 @@
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label for="actual-contribution" style="color: #ff6b35; font-weight: bold;">Your Actual Contribution (secret until both submit)</label>
                             <select id="actual-contribution" style="border: 2px solid #ff6b35; background: rgba(255, 255, 255, 0.95);">
-                                <option value="0">0</option>
-                                <option value="100">100</option>
-                                <option value="200">200</option>
-                                <option value="300">300</option>
-                                <option value="400">400</option>
-                                <option value="500">500</option>
+                                <!-- Options will be populated dynamically based on budget -->
                             </select>
                         </div>
                         
@@ -353,6 +343,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
+        // Game Configuration
+        const DEFAULT_INITIAL_BUDGET = 1000; // Fallback if admin hasn't set one
+        
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
@@ -372,10 +365,10 @@
         let gameState = {
             teamName: '',
             tableCode: '',
-            budget: 500,
+            budget: DEFAULT_INITIAL_BUDGET,
             selectedChoice: null,
             isTeamA: false,
-            lastResetTimestamp: 0 // Track last reset to detect admin resets
+            lastResetTimestamp: 0
         };
 
         let currentTableRef = null;
@@ -387,7 +380,8 @@
             allowNewRounds: true, 
             currentRound: 1, 
             showResults: false,
-            resetTimestamp: 0
+            resetTimestamp: 0,
+            initialBudget: DEFAULT_INITIAL_BUDGET
         };
 
         // Initialize admin listener
@@ -398,6 +392,12 @@
                 if (data) {
                     const previousResetTimestamp = adminState.resetTimestamp || 0;
                     adminState = data;
+                    
+                    // Ensure we have an initial budget set
+                    if (!adminState.initialBudget) {
+                        adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
+                    }
+                    
                     updateRoundDisplay();
                     
                     // Check if admin performed a reset
@@ -406,6 +406,32 @@
                     } else {
                         handleAdminStateChange();
                     }
+                }
+            });
+        }
+
+        function getInitialBudget() {
+            return adminState.initialBudget || DEFAULT_INITIAL_BUDGET;
+        }
+
+        function updateContributionOptions(budget) {
+            const negotiatedSelect = document.getElementById('negotiated-contribution');
+            const actualSelect = document.getElementById('actual-contribution');
+            
+            [negotiatedSelect, actualSelect].forEach(select => {
+                const currentValue = select.value;
+                select.innerHTML = '';
+                for (let i = 0; i <= Math.floor(budget / 100) * 100; i += 100) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `${i}`;
+                    select.appendChild(option);
+                }
+                // Only restore value if it's still valid for current budget
+                if (currentValue && parseInt(currentValue) <= budget) {
+                    select.value = currentValue;
+                } else {
+                    select.value = '0'; // Default to 0 if previous value was invalid
                 }
             });
         }
@@ -613,9 +639,10 @@
                 if (teamData) {
                     gameState.budget = teamData.budget;
                 } else {
-                    // New team
-                    await teamRef.set({ budget: 500, totalRounds: 0 });
-                    gameState.budget = 500;
+                    // New team - use admin-configured initial budget
+                    const initialBudget = getInitialBudget();
+                    await teamRef.set({ budget: initialBudget, totalRounds: 0 });
+                    gameState.budget = initialBudget;
                 }
                 
                 // Join table logic
@@ -654,6 +681,9 @@
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
                 
+                // Initialize contribution options based on current budget
+                updateContributionOptions(gameState.budget);
+                
             } catch (error) {
                 console.error('Error joining table:', error);
                 showError('Error joining table. Please try again.');
@@ -689,15 +719,6 @@
                     openNewTabBtn.style.display = 'none';
                 }
             }
-            
-            // Check if admin started a new round (no round data exists and we were showing results)
-            if (adminState.controlMode === 'controlled' && 
-                (!tableData.roundData || Object.keys(tableData.roundData).length === 0) && 
-                showingResults) {
-                // Admin cleared the round data - reset to play new round
-                resetForNewRound();
-            }
-            
             document.getElementById('my-budget').textContent = gameState.budget;
             
             // Update opponent budget display
@@ -720,20 +741,7 @@
             }
             
             // Update contribution options based on current budget
-            const negotiatedSelect = document.getElementById('negotiated-contribution');
-            const actualSelect = document.getElementById('actual-contribution');
-            
-            [negotiatedSelect, actualSelect].forEach(select => {
-                const currentValue = select.value;
-                select.innerHTML = '';
-                for (let i = 0; i <= Math.floor(gameState.budget / 100) * 100; i += 100) {
-                    const option = document.createElement('option');
-                    option.value = i;
-                    option.textContent = `${i}`;
-                    select.appendChild(option);
-                }
-                select.value = currentValue;
-            });
+            updateContributionOptions(gameState.budget);
             
             // Check if both teams are present
             if (tableData.teamA && tableData.teamB) {
@@ -1254,3 +1262,4 @@
     </script>
 </body>
 </html>
+            

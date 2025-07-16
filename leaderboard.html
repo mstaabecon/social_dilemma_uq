@@ -229,11 +229,11 @@
                 <div class="stat-label">Current Round</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-avg-budget">500</div>
+                <div class="stat-value" id="stat-avg-budget">1000</div>
                 <div class="stat-label">Average Budget</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-max-budget">500</div>
+                <div class="stat-value" id="stat-max-budget">1000</div>
                 <div class="stat-label">Highest Budget</div>
             </div>
         </div>
@@ -269,6 +269,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
+        // Game Configuration
+        const DEFAULT_INITIAL_BUDGET = 1000; // Fallback if admin hasn't set one
+        
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
@@ -285,7 +288,9 @@
         const database = firebase.database();
 
         let teams = {};
-        let adminState = {};
+        let adminState = {
+            initialBudget: DEFAULT_INITIAL_BUDGET
+        };
 
         // Initialize leaderboard
         async function initializeLeaderboard() {
@@ -330,6 +335,10 @@
                 adminListener = database.ref('admin').on('value', (snapshot) => {
                     if (snapshot.exists()) {
                         adminState = snapshot.val();
+                        // Ensure we have an initial budget set
+                        if (!adminState.initialBudget) {
+                            adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
+                        }
                         updateStats();
                     }
                 });
@@ -357,15 +366,17 @@
                 return;
             }
             
+            const defaultBudget = adminState.initialBudget || DEFAULT_INITIAL_BUDGET;
+            
             // Sort teams by budget (descending) - same as admin interface
-            teamsList.sort(([,a], [,b]) => (b.budget || 0) - (a.budget || 0));
+            teamsList.sort(([,a], [,b]) => (b.budget || defaultBudget) - (a.budget || defaultBudget));
             
             let html = '';
             let currentRank = 1;
             let previousBudget = null;
             
             teamsList.forEach(([teamName, teamData], index) => {
-                const budget = teamData.budget || 500;
+                const budget = teamData.budget || defaultBudget;
                 
                 // If budget is different from previous, update rank to current position
                 if (previousBudget !== null && budget !== previousBudget) {
@@ -397,10 +408,11 @@
 
         function updateStats() {
             const totalTeams = Object.keys(teams).length;
+            const defaultBudget = adminState.initialBudget || DEFAULT_INITIAL_BUDGET;
             const avgBudget = totalTeams > 0 ? 
-                Math.round(Object.values(teams).reduce((sum, team) => sum + (team.budget || 500), 0) / totalTeams) : 500;
+                Math.round(Object.values(teams).reduce((sum, team) => sum + (team.budget || defaultBudget), 0) / totalTeams) : defaultBudget;
             const maxBudget = totalTeams > 0 ?
-                Math.max(...Object.values(teams).map(team => team.budget || 500)) : 500;
+                Math.max(...Object.values(teams).map(team => team.budget || defaultBudget)) : defaultBudget;
             
             document.getElementById('stat-total-teams').textContent = totalTeams;
             document.getElementById('stat-current-round').textContent = adminState.currentRound || 1;

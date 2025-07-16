@@ -45,6 +45,7 @@
             display: flex;
             justify-content: center;
             gap: 30px;
+            flex-wrap: wrap;
         }
         
         .mode-controls label {
@@ -58,6 +59,57 @@
         
         .mode-controls input[type="radio"], .mode-controls input[type="checkbox"] {
             transform: scale(1.2);
+        }
+        
+        .budget-config {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .budget-config h3 {
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 18px;
+        }
+        
+        .budget-input-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .budget-input-group label {
+            font-weight: 500;
+        }
+        
+        .budget-input-group input {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 120px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        
+        .budget-input-group button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #3498db;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .budget-input-group button:hover {
+            background: #2980b9;
         }
         
         .round-info {
@@ -286,6 +338,19 @@
     <div class="container">
         <h1>🤝 The Social Dilemma - Admin</h1>
         
+        <!-- Budget Configuration -->
+        <div class="budget-config">
+            <h3>📊 Game Configuration</h3>
+            <div class="budget-input-group">
+                <label for="initial-budget">Initial Budget:</label>
+                <input type="number" id="initial-budget" min="100" max="10000" step="100" value="1000">
+                <button onclick="updateInitialBudget()">Update Budget</button>
+            </div>
+            <small style="display: block; text-align: center; margin-top: 10px; opacity: 0.8;">
+                Current: <span id="current-budget-display">1000</span> | Changes only affect new teams
+            </small>
+        </div>
+        
         <!-- Mode Controls -->
         <div class="mode-controls">
             <label>
@@ -335,11 +400,11 @@
                 <div class="stat-label">Total Teams</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-avg-budget">500</div>
+                <div class="stat-value" id="stat-avg-budget">1000</div>
                 <div class="stat-label">Average Budget</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-max-budget">500</div>
+                <div class="stat-value" id="stat-max-budget">1000</div>
                 <div class="stat-label">Max Budget</div>
             </div>
         </div>
@@ -390,6 +455,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
+        // Game Configuration
+        const INITIAL_BUDGET = 1000; // Default initial budget for new teams
+        
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDC0xP91f9cVgDcWOu9vJUoCC809Q2b1wE",
@@ -416,7 +484,8 @@
             adminPassword: 'admin123',
             sharedDevices: false,
             leaderboardEnabled: false,
-            resetTimestamp: Date.now() // Add reset timestamp to track when resets occur
+            resetTimestamp: Date.now(),
+            initialBudget: INITIAL_BUDGET // Store configurable initial budget
         };
 
         let tables = {};
@@ -433,7 +502,16 @@
                     await adminRef.set(adminState);
                 } else {
                     adminState = { ...adminState, ...adminSnapshot.val() };
+                    // Ensure initial budget is set if not present
+                    if (!adminState.initialBudget) {
+                        adminState.initialBudget = INITIAL_BUDGET;
+                        await adminRef.child('initialBudget').set(INITIAL_BUDGET);
+                    }
                 }
+                
+                // Update UI with current budget
+                document.getElementById('initial-budget').value = adminState.initialBudget;
+                document.getElementById('current-budget-display').textContent = adminState.initialBudget;
                 
                 // Set up listeners
                 setupListeners();
@@ -450,6 +528,11 @@
                 if (snapshot.exists()) {
                     adminState = snapshot.val();
                     updateUI();
+                    // Update budget display
+                    if (adminState.initialBudget) {
+                        document.getElementById('initial-budget').value = adminState.initialBudget;
+                        document.getElementById('current-budget-display').textContent = adminState.initialBudget;
+                    }
                 }
             });
             
@@ -466,6 +549,25 @@
                 updateTeamsDisplay();
                 updateStats();
             });
+        }
+
+        async function updateInitialBudget() {
+            const newBudget = parseInt(document.getElementById('initial-budget').value);
+            
+            if (newBudget < 100 || newBudget > 10000 || newBudget % 100 !== 0) {
+                alert('Budget must be between 100 and 10000, and a multiple of 100');
+                document.getElementById('initial-budget').value = adminState.initialBudget;
+                return;
+            }
+            
+            try {
+                await database.ref('admin/initialBudget').set(newBudget);
+                document.getElementById('current-budget-display').textContent = newBudget;
+                alert(`Initial budget updated to ${newBudget}. This will affect new teams only.`);
+            } catch (error) {
+                console.error('Error updating initial budget:', error);
+                alert('Error updating budget. Please try again.');
+            }
         }
 
         function updateUI() {
@@ -509,10 +611,6 @@
             }
         }
 
-        function getResultsStatusName(showResults) {
-            return showResults ? 'Visible' : 'Hidden';
-        }
-
         function updateTablesDisplay() {
             const container = document.getElementById('tables-container');
             const tablesList = Object.entries(tables);
@@ -554,7 +652,7 @@
             }
             
             // Sort teams by budget (descending)
-            teamsList.sort(([,a], [,b]) => (b.budget || 0) - (a.budget || 0));
+            teamsList.sort(([,a], [,b]) => (b.budget || adminState.initialBudget) - (a.budget || adminState.initialBudget));
             
             let html = '';
             teamsList.forEach(([teamName, teamData]) => {
@@ -562,7 +660,7 @@
                     <div class="team-item">
                         <div class="team-name">${teamName}</div>
                         <div class="team-stats">
-                            Budget: ${teamData.budget || 500}
+                            Budget: ${teamData.budget || adminState.initialBudget}
                             ${teamData.currentTable ? ` | Table: ${teamData.currentTable}` : ''}
                         </div>
                     </div>
@@ -575,10 +673,11 @@
         function updateStats() {
             const activeTables = Object.keys(tables).length;
             const totalTeams = Object.keys(teams).length;
+            const defaultBudget = adminState.initialBudget || INITIAL_BUDGET;
             const avgBudget = totalTeams > 0 ? 
-                Math.round(Object.values(teams).reduce((sum, team) => sum + (team.budget || 500), 0) / totalTeams) : 500;
+                Math.round(Object.values(teams).reduce((sum, team) => sum + (team.budget || defaultBudget), 0) / totalTeams) : defaultBudget;
             const maxBudget = totalTeams > 0 ?
-                Math.max(...Object.values(teams).map(team => team.budget || 500)) : 500;
+                Math.max(...Object.values(teams).map(team => team.budget || defaultBudget)) : defaultBudget;
             const completedTables = Object.values(tables).filter(table => 
                 table.roundData && table.roundData.teamA && table.roundData.teamB
             ).length;
@@ -615,12 +714,13 @@
         }
 
         function getTeamDisplayInfo(tableData) {
+            const defaultBudget = adminState.initialBudget || INITIAL_BUDGET;
             let info = '';
             if (tableData.teamA) {
-                info += `${tableData.teamA.name} (${tableData.teamA.budget || 500})`;
+                info += `${tableData.teamA.name} (${tableData.teamA.budget || defaultBudget})`;
             }
             if (tableData.teamB) {
-                info += ` vs ${tableData.teamB.name} (${tableData.teamB.budget || 500})`;
+                info += ` vs ${tableData.teamB.name} (${tableData.teamB.budget || defaultBudget})`;
             } else if (tableData.teamA) {
                 info += ' - waiting for opponent';
             }
@@ -763,7 +863,7 @@
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
                 updates['admin/showResults'] = false;
                 updates['admin/allowNewRounds'] = true;
-                updates['admin/resetTimestamp'] = Date.now(); // Track when round was reset
+                updates['admin/resetTimestamp'] = Date.now();
                 
                 await database.ref().update(updates);
                 
@@ -863,11 +963,12 @@
                 const updates = {};
                 let tiesFound = 0;
                 let groupsProcessed = 0;
+                const defaultBudget = adminState.initialBudget || INITIAL_BUDGET;
                 
                 // Group teams by budget to find ties
                 const budgetGroups = {};
                 Object.entries(teams).forEach(([teamName, teamData]) => {
-                    const budget = teamData.budget || 500;
+                    const budget = teamData.budget || defaultBudget;
                     if (!budgetGroups[budget]) {
                         budgetGroups[budget] = [];
                     }
@@ -886,7 +987,7 @@
                         // Assign +1 to first team (winner), +0 to others
                         shuffledTeams.forEach(({ name, data }, index) => {
                             const bonus = index === 0 ? 1 : 0; // First team gets +1, others get +0
-                            const newBudget = (data.budget || 500) + bonus;
+                            const newBudget = (data.budget || defaultBudget) + bonus;
                             
                             // Update both teams and tables collections
                             updates[`teams/${name}/budget`] = newBudget;
@@ -990,6 +1091,7 @@
         window.breakAllTies = breakAllTies;
         window.changePassword = changePassword;
         window.exportData = exportData;
+        window.updateInitialBudget = updateInitialBudget;
     </script>
 </body>
 </html>
