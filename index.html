@@ -445,8 +445,10 @@
             // Force complete UI reset
             resetToInitialState();
             
-            // Show reset message
-            showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+            // Show reset message only if we were actually in a game
+            if (currentTableRef) {
+                showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+            }
         }
 
         function resetToInitialState() {
@@ -491,9 +493,12 @@
             const roundDisplay = document.getElementById('current-round-display');
             const roundInfo = document.getElementById('round-info');
             
-            if (adminState.currentRound) {
+            // Only show round info if we're actually in a game (not on initial landing)
+            if (adminState.currentRound && currentTableRef) {
                 roundDisplay.textContent = adminState.currentRound;
                 roundInfo.classList.remove('hidden');
+            } else {
+                roundInfo.classList.add('hidden');
             }
         }
 
@@ -540,7 +545,10 @@
 
         function handleForceTableReset() {
             resetToInitialState();
-            showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+            // Only show message if we were actually in a game
+            if (currentTableRef) {
+                showMessage(`Round ${adminState.currentRound} complete! Please find a new partner and select a new table.`);
+            }
         }
 
         function handleControlledMode() {
