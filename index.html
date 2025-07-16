@@ -237,7 +237,7 @@
             
             <div id="admin-waiting" class="status admin-status hidden">
                 <strong>Waiting for instructor...</strong><br>
-                <span id="admin-message">The instructor will start the round soon.</span>
+                <span id="admin-message">The instructor will start the next round soon.</span>
             </div>
             
             <div id="game-controls" class="hidden">
@@ -381,8 +381,7 @@
             currentRound: 1, 
             showResults: false,
             resetTimestamp: 0,
-            initialBudget: DEFAULT_INITIAL_BUDGET,
-            gameStarted: true // Default to true for free mode
+            initialBudget: DEFAULT_INITIAL_BUDGET
         };
 
         // Initialize admin listener
@@ -397,11 +396,6 @@
                     // Ensure we have an initial budget set
                     if (!adminState.initialBudget) {
                         adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
-                    }
-                    
-                    // Ensure gameStarted flag exists
-                    if (adminState.gameStarted === undefined) {
-                        adminState.gameStarted = adminState.controlMode === 'free';
                     }
                     
                     updateRoundDisplay();
@@ -564,7 +558,7 @@
 
             if (adminState.controlMode === 'controlled' && showingResults) {
                 adminWaiting.classList.remove('hidden');
-                adminMessage.textContent = 'Waiting for instructor to start the round';
+                adminMessage.textContent = 'Waiting for instructor to start the next round';
                 
                 if (nextRoundBtn) {
                     nextRoundBtn.style.display = 'none';
@@ -625,3 +619,655 @@
                 if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
                     // This table has stale data from before the reset - clear it completely
                     console.log('Clearing stale table data from before reset');
+                    tableData = {
+                        teamA: null,
+                        teamB: null,
+                        roundData: {},
+                        status: 'waiting',
+                        createdAfterReset: Date.now() // Mark when this fresh table was created
+                    };
+                }
+                
+                // Set shared device flag if this is the first team to join
+                if (!tableData.teamA && !tableData.teamB) {
+                    tableData.isSharedDevice = isSharedDevice;
+                    tableData.createdAfterReset = Date.now(); // Mark as fresh
+                    // Initialize turn tracking for shared devices
+                    if (isSharedDevice) {
+                        tableData.currentTurn = 1;
+                        tableData.roundOrder = [1, 2];
+                    }
+                }
+                
+                // Get team's existing budget
+                const teamRef = database.ref(`teams/${teamName}`);
+                const teamSnapshot = await teamRef.once('value');
+                const teamData = teamSnapshot.val();
+                
+                if (teamData) {
+                    gameState.budget = teamData.budget;
+                } else {
+                    // New team - use admin-configured initial budget
+                    const initialBudget = getInitialBudget();
+                    await teamRef.set({ budget: initialBudget, totalRounds: 0 });
+                    gameState.budget = initialBudget;
+                }
+                
+                // Join table logic
+                if (!tableData.teamA) {
+                    tableData.teamA = { name: teamName, budget: gameState.budget };
+                    gameState.isTeamA = true;
+                } else if (!tableData.teamB && tableData.teamA.name !== teamName) {
+                    tableData.teamB = { name: teamName, budget: gameState.budget };
+                    gameState.isTeamA = false;
+                } else if (tableData.teamA.name === teamName) {
+                    tableData.teamA.budget = gameState.budget;
+                    gameState.isTeamA = true;
+                } else if (tableData.teamB && tableData.teamB.name === teamName) {
+                    tableData.teamB.budget = gameState.budget;
+                    gameState.isTeamA = false;
+                } else {
+                    showError('Table is full with different teams');
+                    return;
+                }
+                
+                // Update current table reference in team record
+                await database.ref(`teams/${teamName}/currentTable`).set(tableCode);
+                
+                // Update table in Firebase
+                await currentTableRef.set(tableData);
+                
+                // Set up real-time listener
+                currentTableRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        updateGameState(data);
+                    }
+                });
+                
+                // Switch to game phase
+                document.getElementById('setup-phase').classList.add('hidden');
+                document.getElementById('game-phase').classList.remove('hidden');
+                
+                // Initialize contribution options based on current budget
+                updateContributionOptions(gameState.budget);
+                
+            } catch (error) {
+                console.error('Error joining table:', error);
+                showError('Error joining table. Please try again.');
+            }
+        }
+
+        function updateGameState(tableData) {
+            // Check if table change was initiated
+            if (tableData.changeTable) {
+                handleForceTableReset();
+                return;
+            }
+            
+            // Check if this table has been reset and needs fresh start
+            if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
+                console.log('Table data is stale, forcing reset');
+                handleForceTableReset();
+                return;
+            }
+            
+            // Show opponent registration button if this is a shared device table
+            const opponentRegBtn = document.getElementById('opponent-registration-btn');
+            const openNewTabBtn = document.getElementById('open-new-tab-btn');
+            
+            if (tableData.isSharedDevice && !tableData.teamB) {
+                opponentRegBtn.style.display = 'block';
+                openNewTabBtn.style.display = 'none';
+            } else {
+                opponentRegBtn.style.display = 'none';
+                if (adminState.sharedDevices) {
+                    openNewTabBtn.style.display = 'block';
+                } else {
+                    openNewTabBtn.style.display = 'none';
+                }
+            }
+            document.getElementById('my-budget').textContent = gameState.budget;
+            
+            // Update opponent budget display
+            if (tableData.teamA && tableData.teamB) {
+                const opponentBudget = gameState.isTeamA ? tableData.teamB.budget : tableData.teamA.budget;
+                document.getElementById('opponent-budget').textContent = opponentBudget;
+                
+                // Update negotiated contributions display
+                if (tableData.negotiations) {
+                    const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                    const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+                    
+                    if (tableData.negotiations[myTeamKey]) {
+                        document.getElementById('my-negotiated').textContent = tableData.negotiations[myTeamKey].amount;
+                    }
+                    if (tableData.negotiations[opponentKey]) {
+                        document.getElementById('opponent-negotiated').textContent = tableData.negotiations[opponentKey].amount;
+                    }
+                }
+            }
+            
+            // Update contribution options based on current budget
+            updateContributionOptions(gameState.budget);
+            
+            // Check if both teams are present
+            if (tableData.teamA && tableData.teamB) {
+                document.getElementById('waiting-for-opponent').classList.add('hidden');
+                
+                // For shared devices, handle turn-based play
+                if (tableData.isSharedDevice) {
+                    handleSharedDeviceTurns(tableData);
+                } else {
+                    // Original simultaneous play logic for non-shared devices
+                    handleSimultaneousPlay(tableData);
+                }
+            } else {
+                document.getElementById('waiting-for-opponent').classList.remove('hidden');
+                document.getElementById('game-controls').classList.add('hidden');
+            }
+        }
+
+        function resetForNewRound() {
+            isCalculating = false;
+            showingResults = false;
+            
+            document.getElementById('round-results').classList.add('hidden');
+            document.getElementById('game-controls').classList.remove('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            
+            // Reset to negotiation phase
+            document.getElementById('contribution-phase').classList.add('hidden');
+            document.getElementById('negotiation-phase').classList.remove('hidden');
+            
+            // Reset negotiated displays
+            document.getElementById('my-negotiated').textContent = '--';
+            document.getElementById('opponent-negotiated').textContent = '--';
+            
+            // Reset dropdowns
+            document.getElementById('negotiated-contribution').value = '0';
+            document.getElementById('actual-contribution').value = '0';
+        }
+
+        function handleSharedDeviceTurns(tableData) {
+            const myTeamNumber = gameState.isTeamA ? 1 : 2;
+            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+            
+            // Check if it's my turn
+            const isMyTurn = tableData.currentTurn === myTeamNumber;
+            
+            // Check submission status
+            const iHaveSubmitted = tableData.roundData && tableData.roundData[myTeamKey];
+            const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
+            
+            if (iHaveSubmitted && opponentHasSubmitted && !isCalculating) {
+                // Both teams have submitted - show results or wait for admin
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                
+                if (adminState.controlMode === 'controlled') {
+                    if (adminState.showResults) {
+                        document.getElementById('admin-waiting').classList.add('hidden');
+                        isCalculating = true;
+                        calculateResults(tableData);
+                    } else {
+                        document.getElementById('game-controls').classList.add('hidden');
+                        document.getElementById('admin-waiting').classList.remove('hidden');
+                        document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                    }
+                } else {
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    isCalculating = true;
+                    calculateResults(tableData);
+                }
+            } else if (iHaveSubmitted) {
+                // I've submitted, waiting for opponent
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            } else if (isMyTurn) {
+                // It's my turn to play
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            } else {
+                // It's not my turn, waiting for opponent to play
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            }
+        }
+
+        function handleSimultaneousPlay(tableData) {
+            // Original logic for non-shared devices (simultaneous play)
+            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+            
+            if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
+                // I've submitted, waiting for opponent
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.remove('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+            } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
+                // Both teams have submitted
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                
+                if (adminState.controlMode === 'controlled') {
+                    if (adminState.showResults) {
+                        document.getElementById('admin-waiting').classList.add('hidden');
+                        isCalculating = true;
+                        calculateResults(tableData);
+                    } else {
+                        document.getElementById('game-controls').classList.add('hidden');
+                        document.getElementById('admin-waiting').classList.remove('hidden');
+                        document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                    }
+                } else {
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    isCalculating = true;
+                    calculateResults(tableData);
+                }
+            } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
+                // Ready to play
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+            }
+        }
+
+        function finalizeNegotiation() {
+            const negotiatedAmount = document.getElementById('negotiated-contribution').value;
+            
+            // Update the display and set default for actual contribution
+            document.getElementById('negotiated-display').textContent = negotiatedAmount;
+            document.getElementById('actual-contribution').value = negotiatedAmount;
+            
+            // Switch phases
+            document.getElementById('negotiation-phase').classList.add('hidden');
+            document.getElementById('contribution-phase').classList.remove('hidden');
+        }
+
+        async function updateNegotiatedContribution() {
+            const negotiatedAmount = document.getElementById('negotiated-contribution').value;
+            
+            try {
+                // Update negotiated contribution in Firebase so opponent can see it
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations/${myTeamKey}`).set({
+                    amount: parseInt(negotiatedAmount),
+                    timestamp: Date.now()
+                });
+                
+                // Update own display
+                document.getElementById('my-negotiated').textContent = negotiatedAmount;
+                
+            } catch (error) {
+                console.error('Error updating negotiated contribution:', error);
+            }
+        }
+
+        async function submitRound() {
+            const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
+            const actualContribution = parseInt(document.getElementById('actual-contribution').value);
+            
+            try {
+                // Submit this team's data to Firebase
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                const roundDataRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData/${myTeamKey}`);
+                
+                await roundDataRef.set({
+                    negotiated: negotiatedContribution,
+                    actual: actualContribution,
+                    timestamp: Date.now()
+                });
+                
+                // Hide controls and show waiting
+                document.getElementById('game-controls').classList.add('hidden');
+                
+                // For shared devices, update turn after submission
+                const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
+                const tableSnapshot = await tableRef.once('value');
+                const tableData = tableSnapshot.val();
+                
+                if (tableData && tableData.isSharedDevice) {
+                    const myTeamNumber = gameState.isTeamA ? 1 : 2;
+                    const opponentTeamNumber = myTeamNumber === 1 ? 2 : 1;
+                    
+                    // Check if opponent has already submitted
+                    const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+                    const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
+                    
+                    if (!opponentHasSubmitted) {
+                        // Switch turn to opponent
+                        await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(opponentTeamNumber);
+                    }
+                    // If opponent already submitted, results will be calculated automatically
+                }
+                
+            } catch (error) {
+                console.error('Error submitting round:', error);
+                showError('Error submitting. Please try again.');
+            }
+        }
+
+        async function calculateResults(tableData) {
+            const dataA = tableData.roundData.teamA;
+            const dataB = tableData.roundData.teamB;
+            
+            if (!dataA || !dataB) return;
+            
+            // Calculate public good returns
+            const totalContribution = dataA.actual + dataB.actual;
+            const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 = 0.75 per player
+            
+            // Calculate new budgets
+            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+            
+            try {
+                // Update budgets in Firebase
+                const updates = {};
+                updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
+                updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                updates[`tables/${gameState.tableCode}/resultsProcessed`] = true;
+                
+                // Update team records
+                updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+                updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+                
+                // Get current round counts and increment
+                const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
+                const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
+                
+                updates[`teams/${tableData.teamA.name}/totalRounds`] = (teamASnapshot.val() || 0) + 1;
+                updates[`teams/${tableData.teamB.name}/totalRounds`] = (teamBSnapshot.val() || 0) + 1;
+                
+                await database.ref().update(updates);
+                
+                // Update local budget
+                gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
+                
+                // Display results
+                showResults(dataA, dataB, publicGoodReturn, tableData);
+                
+                // Reset calculation flag
+                isCalculating = false;
+                
+            } catch (error) {
+                console.error('Error updating results:', error);
+                showError('Error calculating results. Please refresh.');
+                isCalculating = false;
+            }
+        }
+
+        function showResults(dataA, dataB, publicGoodReturn, tableData) {
+            const team1Name = tableData.teamA.name;
+            const team2Name = tableData.teamB.name;
+            const team1Budget = Math.round((tableData.teamA.budget - dataA.actual) + publicGoodReturn);
+            const team2Budget = Math.round((tableData.teamB.budget - dataB.actual) + publicGoodReturn);
+            const team1Leftover = tableData.teamA.budget - dataA.actual;
+            const team2Leftover = tableData.teamB.budget - dataB.actual;
+            
+            const resultsHTML = `
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3);"></th>
+                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${team1Name}</th>
+                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${team2Name}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Negotiated Contribution</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataA.negotiated}</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataB.negotiated}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Actual Contribution</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataA.actual}</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataB.actual}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Public Good Return (each)</td>
+                            <td colspan="2" style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${Math.round(publicGoodReturn)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Leftover Budget</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${team1Leftover}</td>
+                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${team2Leftover}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold;">New Budget</td>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${team1Budget}</td>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${team2Budget}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('results-content').innerHTML = resultsHTML;
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+            document.getElementById('round-results').classList.remove('hidden');
+            
+            // Set flag to prevent game controls from reappearing
+            showingResults = true;
+            
+            // Handle admin control for next round
+            if (adminState.controlMode === 'controlled') {
+                handleControlledMode();
+            }
+        }
+
+        async function nextRound() {
+            try {
+                const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
+                const tableSnapshot = await tableRef.once('value');
+                const tableData = tableSnapshot.val();
+                
+                // Clear round data for this table but keep teams
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).set({});
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations`).set({});
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/resultsProcessed`).set(null);
+                
+                // For shared devices, alternate the round order and reset turn
+                if (tableData && tableData.isSharedDevice) {
+                    const currentOrder = tableData.roundOrder || [1, 2];
+                    const newOrder = [currentOrder[1], currentOrder[0]]; // Reverse the order
+                    
+                    await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundOrder`).set(newOrder);
+                    await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(newOrder[0]);
+                }
+                
+                // Reset for new round
+                resetForNewRound();
+                
+            } catch (error) {
+                console.error('Error starting new round:', error);
+                showError('Error preparing new round. Please refresh if needed.');
+            }
+        }
+
+        async function changeTable() {
+            try {
+                // Signal both teams to change tables by setting a flag
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/changeTable`).set(true);
+                
+                // Remove both teams from current table
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/teamA`).remove();
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/teamB`).remove();
+                
+                // Clear round data
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).remove();
+                
+                // Reset UI for table selection
+                handleForceTableReset();
+                
+            } catch (error) {
+                console.error('Error changing table:', error);
+                showError('Error changing table. Please refresh if needed.');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 3000);
+        }
+
+        function showMessage(message) {
+            showError(message); // Reuse error display for general messages
+        }
+
+        function openNewTab() {
+            const tableCode = gameState.tableCode;
+            const newTabUrl = `index.html?table=${tableCode}`;
+            window.open(newTabUrl, '_blank');
+        }
+
+        function openOpponentRegistration() {
+            const tableCode = gameState.tableCode;
+            const newTabUrl = `index.html?table=${tableCode}`;
+            window.open(newTabUrl, '_blank');
+        }
+
+        async function cancelWaiting() {
+            try {
+                // Remove this team from current table
+                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/${myTeamKey}`).remove();
+                
+                // Stop listening to current table
+                if (currentTableRef) {
+                    currentTableRef.off();
+                    currentTableRef = null;
+                }
+                
+                // Reset UI for table selection
+                resetToInitialState();
+                showError('Cancelled - you can now select a different table');
+                
+            } catch (error) {
+                console.error('Error cancelling:', error);
+                showError('Error cancelling. Please refresh the page.');
+            }
+        }
+
+        // Initialize admin listener when page loads
+        window.addEventListener('load', () => {
+            initializeAdminListener();
+            checkURLParameters();
+        });
+
+        function checkURLParameters() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tableCode = urlParams.get('table');
+            const teamName = urlParams.get('team');
+            const isRegistered = urlParams.get('registered');
+            
+            // Handle table code pre-fill (for opponent registration)
+            if (tableCode) {
+                // Pre-fill the table code field
+                document.getElementById('table-code').value = tableCode.toUpperCase();
+                
+                // Add visual indication that this is pre-filled
+                const tableInput = document.getElementById('table-code');
+                tableInput.style.background = 'rgba(76, 175, 80, 0.2)';
+                tableInput.style.border = '2px solid #4CAF50';
+                
+                // Add helper text
+                const tableGroup = tableInput.parentElement;
+                const helperText = document.createElement('small');
+                helperText.style.color = '#4CAF50';
+                helperText.style.fontSize = '14px';
+                helperText.style.display = 'block';
+                helperText.style.marginTop = '5px';
+                helperText.textContent = 'Table code pre-filled for opponent registration';
+                tableGroup.appendChild(helperText);
+                
+                // Check if this table is already marked as shared device
+                database.ref(`tables/${tableCode.toUpperCase()}`).once('value').then((snapshot) => {
+                    const tableData = snapshot.val();
+                    if (tableData && tableData.isSharedDevice) {
+                        // Pre-check and disable the shared device toggle
+                        const sharedDeviceCheckbox = document.getElementById('is-shared-device');
+                        sharedDeviceCheckbox.checked = true;
+                        sharedDeviceCheckbox.disabled = true;
+                        
+                        // Add visual indication
+                        const sharedDeviceOption = document.getElementById('shared-device-option');
+                        if (sharedDeviceOption) {
+                            sharedDeviceOption.style.opacity = '0.7';
+                            
+                            // Add helper text for shared device
+                            const sharedHelperText = document.createElement('small');
+                            sharedHelperText.style.color = '#4CAF50';
+                            sharedHelperText.style.fontSize = '13px';
+                            sharedHelperText.style.display = 'block';
+                            sharedHelperText.style.marginTop = '5px';
+                            sharedHelperText.textContent = 'Shared device mode set by first team';
+                            sharedDeviceOption.appendChild(sharedHelperText);
+                        }
+                    }
+                }).catch((error) => {
+                    console.error('Error checking table shared device status:', error);
+                });
+            }
+            
+            // Handle team name pre-fill (from registration)
+            if (teamName && isRegistered) {
+                // Pre-fill the team name field
+                document.getElementById('team-name').value = teamName;
+                
+                // Add visual indication that registration was successful
+                const teamInput = document.getElementById('team-name');
+                teamInput.style.background = 'rgba(76, 175, 80, 0.2)';
+                teamInput.style.border = '2px solid #4CAF50';
+                teamInput.readOnly = true; // Prevent editing of registered name
+                
+                // Add success message
+                const teamGroup = teamInput.parentElement;
+                const successText = document.createElement('small');
+                successText.style.color = '#4CAF50';
+                successText.style.fontSize = '14px';
+                successText.style.display = 'block';
+                successText.style.marginTop = '5px';
+                successText.textContent = '✓ Team registration successful!';
+                teamGroup.appendChild(successText);
+                
+                // Focus on table code field since team name is filled
+                setTimeout(() => {
+                    document.getElementById('table-code').focus();
+                }, 100);
+            }
+        }
+
+        // Make functions globally accessible
+        window.joinTable = joinTable;
+        window.submitRound = submitRound;
+        window.nextRound = nextRound;
+        window.changeTable = changeTable;
+        window.openNewTab = openNewTab;
+        window.openOpponentRegistration = openOpponentRegistration;
+        window.cancelWaiting = cancelWaiting;
+        window.updateNegotiatedContribution = updateNegotiatedContribution;
+        window.finalizeNegotiation = finalizeNegotiation;
+    </script>
+</body>
+</html>
+            

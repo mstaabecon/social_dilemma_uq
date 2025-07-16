@@ -485,8 +485,7 @@
             sharedDevices: false,
             leaderboardEnabled: false,
             resetTimestamp: Date.now(),
-            initialBudget: INITIAL_BUDGET, // Store configurable initial budget
-            gameStarted: false // Track if game has been started in controlled mode
+            initialBudget: INITIAL_BUDGET // Store configurable initial budget
         };
 
         let tables = {};
@@ -507,11 +506,6 @@
                     if (!adminState.initialBudget) {
                         adminState.initialBudget = INITIAL_BUDGET;
                         await adminRef.child('initialBudget').set(INITIAL_BUDGET);
-                    }
-                    // Ensure gameStarted flag exists
-                    if (adminState.gameStarted === undefined) {
-                        adminState.gameStarted = false;
-                        await adminRef.child('gameStarted').set(false);
                     }
                 }
                 
@@ -599,18 +593,12 @@
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
-                // Update button text based on game state
-                if (!adminState.gameStarted) {
-                    nextRoundBtn.textContent = 'Start Game';
-                } else {
-                    nextRoundBtn.textContent = 'Start Next Round';
-                }
-                
                 if (!adminState.showResults) {
                     // Results are hidden
                     toggleResultsBtn.textContent = 'Show Results to Students';
                     toggleResultsBtn.disabled = false;
                     toggleResultsBtn.className = 'button button-primary';
+                    nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = false;
                 } else {
                     // Results are visible
@@ -710,11 +698,6 @@
                 return { type: 'incomplete', icon: '👥', text: 'Waiting for Teams' };
             }
             
-            // In controlled mode, if game hasn't started yet
-            if (adminState.controlMode === 'controlled' && !adminState.gameStarted) {
-                return { type: 'waiting', icon: '⏸️', text: 'Waiting for Game Start' };
-            }
-            
             if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
                 if (!adminState.showResults) {
                     return { type: 'ready', icon: '⏸️', text: 'Round Complete (Results Hidden)' };
@@ -756,13 +739,6 @@
                 
                 if (selectedMode === 'free') {
                     updates['admin/allowNewRounds'] = true;
-                    updates['admin/gameStarted'] = true; // Always true in free mode
-                } else {
-                    // In controlled mode, reset gameStarted to false if switching from free mode
-                    const currentMode = adminState.controlMode;
-                    if (currentMode === 'free') {
-                        updates['admin/gameStarted'] = false;
-                    }
                 }
                 
                 await database.ref().update(updates);
@@ -781,3 +757,354 @@
             } catch (error) {
                 console.error('Error toggling shared devices mode:', error);
                 alert('Error updating shared devices mode. Check console for details.');
+            }
+        }
+
+        async function toggleLeaderboard() {
+            const isLeaderboardEnabled = document.getElementById('leaderboard-toggle').checked;
+            
+            try {
+                await database.ref('admin/leaderboardEnabled').set(isLeaderboardEnabled);
+                
+            } catch (error) {
+                console.error('Error toggling leaderboard:', error);
+                alert('Error updating leaderboard setting. Check console for details.');
+            }
+        }
+
+        async function toggleResultsDisplay() {
+            try {
+                const newShowResults = !adminState.showResults;
+                
+                if (newShowResults) {
+                    // Showing results - process all completed tables
+                    const updates = {};
+                    let processedCount = 0;
+                    
+                    for (let tableCode in tables) {
+                        const tableData = tables[tableCode];
+                        
+                        if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
+                            // Calculate results
+                            const dataA = tableData.roundData.teamA;
+                            const dataB = tableData.roundData.teamB;
+                            const totalContribution = dataA.actual + dataB.actual;
+                            const publicGoodReturn = (totalContribution * 1.5) / 2;
+                            
+                            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+                            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+                            
+                            // Update budgets
+                            updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
+                            updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                            
+                            // Update team records
+                            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+                            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+                            
+                            // Only increment rounds if this is a new round for the team
+                            const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
+                            const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
+                            const currentAdminRound = adminState.currentRound || 1;
+                            
+                            if (teamACurrentRounds < currentAdminRound) {
+                                updates[`teams/${tableData.teamA.name}/totalRounds`] = currentAdminRound;
+                            }
+                            if (teamBCurrentRounds < currentAdminRound) {
+                                updates[`teams/${tableData.teamB.name}/totalRounds`] = currentAdminRound;
+                            }
+                            
+                            processedCount++;
+                        }
+                    }
+                    
+                    // Set results as visible
+                    updates['admin/showResults'] = true;
+                    
+                    await database.ref().update(updates);
+                    
+                    if (processedCount > 0) {
+                        alert(`Results now visible to ${processedCount} completed tables!`);
+                    } else {
+                        alert('Results display toggled, but no completed tables to show results for.');
+                    }
+                } else {
+                    // Hiding results (probably rare, but possible)
+                    await database.ref('admin/showResults').set(false);
+                    alert('Results are now hidden from students.');
+                }
+                
+            } catch (error) {
+                console.error('Error toggling results display:', error);
+                alert('Error toggling results display. Check console for details.');
+            }
+        }
+
+        async function startNextRound() {
+            try {
+                const updates = {};
+                
+                // Clear all round data but keep teams at tables
+                for (let tableCode in tables) {
+                    updates[`tables/${tableCode}/roundData`] = null;
+                    updates[`tables/${tableCode}/negotiations`] = null;
+                    updates[`tables/${tableCode}/resultsProcessed`] = null;
+                    
+                    // Reset shared device turn tracking if applicable
+                    if (tables[tableCode].isSharedDevice) {
+                        // Randomize starting order for new round
+                        const randomOrder = Math.random() < 0.5 ? [1, 2] : [2, 1];
+                        updates[`tables/${tableCode}/roundOrder`] = randomOrder;
+                        updates[`tables/${tableCode}/currentTurn`] = randomOrder[0];
+                    }
+                }
+                
+                // Update admin state for new round
+                updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
+                updates['admin/showResults'] = false;
+                updates['admin/allowNewRounds'] = true;
+                updates['admin/resetTimestamp'] = Date.now();
+                
+                await database.ref().update(updates);
+                
+                alert(`New round started! All teams can now negotiate and play.`);
+                
+            } catch (error) {
+                console.error('Error starting next round:', error);
+                alert('Error starting next round. Check console for details.');
+            }
+        }
+
+        async function resetAllTables() {
+            if (!confirm('This will remove all teams from tables and force them to find new partners. All round data will be cleared and a new round will start. Continue?')) {
+                return;
+            }
+            
+            try {
+                const resetTimestamp = Date.now();
+                
+                // Set force reset flag with timestamp
+                await database.ref('admin/forceTableReset').set(true);
+                await database.ref('admin/resetTimestamp').set(resetTimestamp);
+                
+                // Clear ALL table data completely
+                await database.ref('tables').set({});
+                
+                // Clear current table references from all teams
+                const teamsUpdate = {};
+                for (let teamName in teams) {
+                    teamsUpdate[`teams/${teamName}/currentTable`] = null;
+                }
+                
+                if (Object.keys(teamsUpdate).length > 0) {
+                    await database.ref().update(teamsUpdate);
+                }
+                
+                // Start new round automatically (increment round number)
+                const newRound = (adminState.currentRound || 1) + 1;
+                
+                // Reset admin state with new round
+                await database.ref().update({
+                    'admin/currentRound': newRound,
+                    'admin/currentPhase': 'playing',
+                    'admin/showResults': false,
+                    'admin/processingResults': false
+                });
+                
+                // Reset the force flag after a delay
+                setTimeout(async () => {
+                    await database.ref('admin/forceTableReset').set(false);
+                }, 3000);
+                
+                alert(`All tables completely reset! Teams must now re-pair for Round ${newRound}.`);
+                
+            } catch (error) {
+                console.error('Error resetting tables:', error);
+                alert('Error resetting tables. Check console for details.');
+            }
+        }
+
+        async function changePassword() {
+            const currentPasswordRef = database.ref('admin/adminPassword');
+            
+            try {
+                const currentPasswordSnapshot = await currentPasswordRef.once('value');
+                const currentPassword = currentPasswordSnapshot.val() || 'admin123';
+                
+                const enteredCurrentPassword = prompt("Enter current admin password:");
+                if (enteredCurrentPassword !== currentPassword) {
+                    alert("Incorrect current password.");
+                    return;
+                }
+                
+                const newPassword = prompt("Enter new admin password:");
+                if (!newPassword || newPassword.trim() === '') {
+                    alert("Password cannot be empty.");
+                    return;
+                }
+                
+                const confirmPassword = prompt("Confirm new admin password:");
+                if (newPassword !== confirmPassword) {
+                    alert("Passwords do not match.");
+                    return;
+                }
+                
+                await currentPasswordRef.set(newPassword);
+                alert("Admin password changed successfully!");
+                
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('Error changing password. Check console for details.');
+            }
+        }
+
+        async function finaliseScores() {
+            if (!confirm('This will finalise the game scores and award prizes. This action cannot be undone. Continue?')) {
+                return;
+            }
+            
+            try {
+                const updates = {};
+                const teamsList = Object.entries(teams);
+                
+                if (teamsList.length < 2) {
+                    alert('Need at least 2 teams to finalise scores.');
+                    return;
+                }
+                
+                const defaultBudget = adminState.initialBudget || INITIAL_BUDGET;
+                
+                // Sort teams by budget (descending)
+                teamsList.sort(([,a], [,b]) => (b.budget || defaultBudget) - (a.budget || defaultBudget));
+                
+                // Check if there's a tie for first place
+                const firstPlaceBudget = teamsList[0][1].budget || defaultBudget;
+                const tiedForFirst = teamsList.filter(([,teamData]) => 
+                    (teamData.budget || defaultBudget) === firstPlaceBudget
+                );
+                
+                let firstPlaceWinner, secondPlaceWinner;
+                let isRandomPrize = false;
+                
+                if (tiedForFirst.length > 1) {
+                    // Tie for first place - break tie to determine 1st and 2nd
+                    const shuffledTied = [...tiedForFirst].sort(() => Math.random() - 0.5);
+                    firstPlaceWinner = shuffledTied[0][0]; // First team name
+                    secondPlaceWinner = shuffledTied[1][0]; // Second team name
+                    isRandomPrize = false; // This is earned 2nd place, not random
+                    
+                    // Give +1 to first place winner to break the tie
+                    const firstPlaceBudgetNew = (shuffledTied[0][1].budget || defaultBudget) + 1;
+                    updates[`teams/${firstPlaceWinner}/budget`] = firstPlaceBudgetNew;
+                    
+                    // Update table references if they exist
+                    Object.entries(tables).forEach(([tableCode, tableData]) => {
+                        if (tableData.teamA && tableData.teamA.name === firstPlaceWinner) {
+                            updates[`tables/${tableCode}/teamA/budget`] = firstPlaceBudgetNew;
+                        }
+                        if (tableData.teamB && tableData.teamB.name === firstPlaceWinner) {
+                            updates[`tables/${tableCode}/teamB/budget`] = firstPlaceBudgetNew;
+                        }
+                    });
+                    
+                } else {
+                    // Clear winner - randomly select second place from all other teams
+                    firstPlaceWinner = teamsList[0][0]; // First team name
+                    const otherTeams = teamsList.slice(1); // All teams except first
+                    const randomIndex = Math.floor(Math.random() * otherTeams.length);
+                    secondPlaceWinner = otherTeams[randomIndex][0]; // Random team name
+                    isRandomPrize = true; // This is a random prize
+                }
+                
+                // Store the results in admin state
+                updates['admin/gameFinalized'] = true;
+                updates['admin/firstPlaceWinner'] = firstPlaceWinner;
+                updates['admin/secondPlaceWinner'] = secondPlaceWinner;
+                updates['admin/isRandomPrize'] = isRandomPrize;
+                updates['admin/finalizationTimestamp'] = Date.now();
+                
+                await database.ref().update(updates);
+                
+                const prizeType = isRandomPrize ? 'Random Prize' : 'Second Place';
+                alert(`Scores finalized!\n\n🥇 First Place: ${firstPlaceWinner}\n${isRandomPrize ? '🎲' : '🥈'} ${prizeType}: ${secondPlaceWinner}`);
+                
+            } catch (error) {
+                console.error('Error finalizing scores:', error);
+                alert('Error finalizing scores. Check console for details.');
+            }
+        }
+
+        async function exportData() {
+            try {
+                const data = {
+                    exportTime: new Date().toISOString(),
+                    adminState: adminState,
+                    teams: teams,
+                    tables: tables
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `social-dilemma-data-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                console.error('Error exporting data:', error);
+                alert('Error exporting data. Check console for details.');
+            }
+        }
+
+        // Simple admin access check
+        async function checkAdminAccess() {
+            try {
+                // Get current password from database
+                const passwordRef = database.ref('admin/adminPassword');
+                const passwordSnapshot = await passwordRef.once('value');
+                const currentPassword = passwordSnapshot.val() || 'admin123';
+                
+                const enteredPassword = prompt("Enter admin password:");
+                if (enteredPassword !== currentPassword) {
+                    alert("Access denied");
+                    window.location.href = "index.html";
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Error checking admin access:', error);
+                // Fallback to default password if database error
+                const enteredPassword = prompt("Enter admin password:");
+                if (enteredPassword !== 'admin123') {
+                    alert("Access denied");
+                    window.location.href = "index.html";
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            if (await checkAdminAccess()) {
+                initializeAdmin();
+            }
+        });
+
+        // Make functions globally accessible
+        window.changeControlMode = changeControlMode;
+        window.toggleSharedDevices = toggleSharedDevices;
+        window.toggleLeaderboard = toggleLeaderboard;
+        window.toggleResultsDisplay = toggleResultsDisplay;
+        window.startNextRound = startNextRound;
+        window.resetAllTables = resetAllTables;
+        window.finaliseScores = finaliseScores;
+        window.changePassword = changePassword;
+        window.exportData = exportData;
+        window.updateInitialBudget = updateInitialBudget;
+    </script>
+</body>
+</html>
