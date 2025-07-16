@@ -863,7 +863,7 @@
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
                 updates['admin/showResults'] = false;
                 updates['admin/allowNewRounds'] = true;
-                //updates['admin/resetTimestamp'] = Date.now();
+                updates['admin/resetTimestamp'] = Date.now();
                 
                 await database.ref().update(updates);
                 
