@@ -110,6 +110,11 @@
             box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
         
+        .team-item.rank-2 {
+            border-color: #C0C0C0;
+            background: rgba(192, 192, 192, 0.1);
+        }
+        
         .team-item.random-prize {
             border-color: #9C27B0;
             background: rgba(156, 39, 176, 0.1);
@@ -130,6 +135,10 @@
         
         .team-rank.rank-1 {
             color: #FFD700;
+        }
+        
+        .team-rank.rank-2 {
+            color: #C0C0C0;
         }
         
         .team-rank.random-prize {
@@ -373,10 +382,11 @@
             // Check if scores have been finalized
             const isFinalized = adminState.gameFinalized;
             const firstPlaceWinner = adminState.firstPlaceWinner;
-            const randomPrizeWinner = adminState.randomPrizeWinner;
+            const secondPlaceWinner = adminState.secondPlaceWinner;
+            const isRandomPrize = adminState.isRandomPrize;
             
             // Update prize winners display
-            updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, randomPrizeWinner);
+            updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, secondPlaceWinner, isRandomPrize);
             
             let html = '';
             let currentRank = 1;
@@ -402,11 +412,18 @@
                         rankClass = 'rank-1';
                         trophy = '🥇';
                         displayRank = '1st';
-                    } else if (teamName === randomPrizeWinner) {
-                        itemClass = 'random-prize';
-                        rankClass = 'random-prize';
-                        trophy = '🎲';
-                        displayRank = 'Prize';
+                    } else if (teamName === secondPlaceWinner) {
+                        if (isRandomPrize) {
+                            itemClass = 'random-prize';
+                            rankClass = 'random-prize';
+                            trophy = '🎲';
+                            displayRank = 'Prize';
+                        } else {
+                            itemClass = 'rank-2';
+                            rankClass = 'rank-2';
+                            trophy = '🥈';
+                            displayRank = '2nd';
+                        }
                     } else {
                         displayRank = currentRank;
                     }
@@ -438,11 +455,15 @@
             container.innerHTML = html;
         }
 
-        function updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, randomPrizeWinner) {
+        function updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, secondPlaceWinner, isRandomPrize) {
             const prizeWinnersDiv = document.getElementById('prize-winners');
             const prizeContent = document.getElementById('prize-winners-content');
             
-            if (isFinalized && firstPlaceWinner && randomPrizeWinner) {
+            if (isFinalized && firstPlaceWinner && secondPlaceWinner) {
+                const secondPrizeIcon = isRandomPrize ? '🎲' : '🥈';
+                const secondPrizeTitle = isRandomPrize ? 'Random Prize' : 'Second Place';
+                const secondPrizeColor = isRandomPrize ? '#9C27B0' : '#C0C0C0';
+                
                 prizeContent.innerHTML = `
                     <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px; padding: 10px;">
                         <div style="text-align: center; background: rgba(255, 215, 0, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
@@ -450,10 +471,10 @@
                             <div style="font-weight: bold; font-size: 18px; color: #FFD700;">First Place</div>
                             <div style="font-size: 16px; margin-top: 5px;">${firstPlaceWinner}</div>
                         </div>
-                        <div style="text-align: center; background: rgba(156, 39, 176, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
-                            <div style="font-size: 24px; margin-bottom: 5px;">🎲</div>
-                            <div style="font-weight: bold; font-size: 18px; color: #9C27B0;">Random Prize</div>
-                            <div style="font-size: 16px; margin-top: 5px;">${randomPrizeWinner}</div>
+                        <div style="text-align: center; background: rgba(${isRandomPrize ? '156, 39, 176' : '192, 192, 192'}, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 24px; margin-bottom: 5px;">${secondPrizeIcon}</div>
+                            <div style="font-weight: bold; font-size: 18px; color: ${secondPrizeColor};">${secondPrizeTitle}</div>
+                            <div style="font-size: 16px; margin-top: 5px;">${secondPlaceWinner}</div>
                         </div>
                     </div>
                 `;

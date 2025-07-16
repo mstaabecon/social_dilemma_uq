@@ -983,13 +983,15 @@
                     (teamData.budget || defaultBudget) === firstPlaceBudget
                 );
                 
-                let firstPlaceWinner, randomWinner;
+                let firstPlaceWinner, secondPlaceWinner;
+                let isRandomPrize = false;
                 
                 if (tiedForFirst.length > 1) {
                     // Tie for first place - break tie to determine 1st and 2nd
                     const shuffledTied = [...tiedForFirst].sort(() => Math.random() - 0.5);
                     firstPlaceWinner = shuffledTied[0][0]; // First team name
-                    randomWinner = shuffledTied[1][0]; // Second team name
+                    secondPlaceWinner = shuffledTied[1][0]; // Second team name
+                    isRandomPrize = false; // This is earned 2nd place, not random
                     
                     // Give +1 to first place winner to break the tie
                     const firstPlaceBudgetNew = (shuffledTied[0][1].budget || defaultBudget) + 1;
@@ -1010,18 +1012,21 @@
                     firstPlaceWinner = teamsList[0][0]; // First team name
                     const otherTeams = teamsList.slice(1); // All teams except first
                     const randomIndex = Math.floor(Math.random() * otherTeams.length);
-                    randomWinner = otherTeams[randomIndex][0]; // Random team name
+                    secondPlaceWinner = otherTeams[randomIndex][0]; // Random team name
+                    isRandomPrize = true; // This is a random prize
                 }
                 
                 // Store the results in admin state
                 updates['admin/gameFinalized'] = true;
                 updates['admin/firstPlaceWinner'] = firstPlaceWinner;
-                updates['admin/randomPrizeWinner'] = randomWinner;
+                updates['admin/secondPlaceWinner'] = secondPlaceWinner;
+                updates['admin/isRandomPrize'] = isRandomPrize;
                 updates['admin/finalizationTimestamp'] = Date.now();
                 
                 await database.ref().update(updates);
                 
-                alert(`Scores finalized!\n\n🥇 First Place: ${firstPlaceWinner}\n🎲 Random Prize: ${randomWinner}`);
+                const prizeType = isRandomPrize ? 'Random Prize' : 'Second Place';
+                alert(`Scores finalized!\n\n🥇 First Place: ${firstPlaceWinner}\n${isRandomPrize ? '🎲' : '🥈'} ${prizeType}: ${secondPlaceWinner}`);
                 
             } catch (error) {
                 console.error('Error finalizing scores:', error);
