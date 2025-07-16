@@ -797,6 +797,8 @@
                             // Update budgets
                             updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
                             updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
+                            // ADDITION: Mark results as processed for this round
+                            updates[`tables/${tableCode}/resultsProcessed`] = adminState.currentRound || 1;
                             
                             // Update team records
                             updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);

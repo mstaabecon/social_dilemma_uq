@@ -506,46 +506,75 @@
             }
         }
 
-        function handleAdminStateChange() {
-            // Handle force table reset
-            if (adminState.forceTableReset) {
-                handleForceTableReset();
-                return;
-            }
+    function handleAdminStateChange() {
+        // Handle force table reset
+        if (adminState.forceTableReset) {
+            handleForceTableReset();
+            return;
+        }
 
-            // Show/hide shared device option based on admin setting
-            const sharedDeviceOption = document.getElementById('shared-device-option');
-            const sharedDeviceCheckbox = document.getElementById('is-shared-device');
+        // Show/hide shared device option based on admin setting
+        const sharedDeviceOption = document.getElementById('shared-device-option');
+        const sharedDeviceCheckbox = document.getElementById('is-shared-device');
+        
+        if (adminState.sharedDevices) {
+            sharedDeviceOption.style.display = 'block';
+            sharedDeviceCheckbox.checked = true;
+        } else {
+            sharedDeviceOption.style.display = 'none';
+            sharedDeviceCheckbox.checked = false;
+        }
+
+        // Handle centrally controlled mode
+        if (adminState.controlMode === 'controlled') {
+            handleControlledMode();
             
-            if (adminState.sharedDevices) {
-                sharedDeviceOption.style.display = 'block';
-                sharedDeviceCheckbox.checked = true;
-            } else {
-                sharedDeviceOption.style.display = 'none';
-                sharedDeviceCheckbox.checked = false;
-            }
-
-            // Handle centrally controlled mode
-            if (adminState.controlMode === 'controlled') {
-                handleControlledMode();
-                
-                // Check if admin just enabled results display and we have complete round data
-                if (adminState.showResults && !showingResults) {
-                    if (currentTableRef) {
-                        currentTableRef.once('value').then((snapshot) => {
-                            const tableData = snapshot.val();
-                            if (tableData && tableData.roundData && 
-                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating && !tableData.resultsProcessed) {
+            // Check if admin just enabled results display and we have complete round data
+            if (adminState.showResults && !showingResults) {
+                if (currentTableRef) {
+                    currentTableRef.once('value').then((snapshot) => {
+                        const tableData = snapshot.val();
+                        if (tableData && tableData.roundData && 
+                            tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
+                            // CHANGE: Check if results were already processed for this round
+                            if (tableData.resultsProcessed !== adminState.currentRound) {
                                 isCalculating = true;
                                 calculateResults(tableData);
+                            } else {
+                                // Results already processed for this round, just show them
+                                showingResults = true;
+                                displayPreviousResults(tableData);
                             }
-                        }).catch((error) => {
-                            console.error('Error checking table data:', error);
-                        });
-                    }
+                        }
+                    }).catch((error) => {
+                        console.error('Error checking table data:', error);
+                    });
                 }
             }
         }
+    }
+
+    function displayPreviousResults(tableData) {
+    // Reconstruct the results display without recalculating
+    const dataA = tableData.roundData.teamA;
+    const dataB = tableData.roundData.teamB;
+    
+    if (!dataA || !dataB) return;
+    
+    // Calculate what the public good return was (for display only)
+    const totalContribution = dataA.actual + dataB.actual;
+    const publicGoodReturn = totalContribution * 0.75;
+    
+    // Update local budget from the stored value
+    gameState.budget = gameState.isTeamA ? tableData.teamA.budget : tableData.teamB.budget;
+    
+    // Update budget display
+    document.getElementById('my-budget').textContent = gameState.budget;
+    
+    // Show the results without recalculating
+    showResults(dataA, dataB, publicGoodReturn, tableData);
+    }
+
 
         function handleForceTableReset() {
             resetToInitialState();
@@ -819,99 +848,131 @@
             document.getElementById('actual-contribution').value = '0';
         }
 
-        function handleSharedDeviceTurns(tableData) {
-            const myTeamNumber = gameState.isTeamA ? 1 : 2;
-            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+    function handleSharedDeviceTurns(tableData) {
+        const myTeamNumber = gameState.isTeamA ? 1 : 2;
+        const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+        const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+        
+        // Check if it's my turn
+        const isMyTurn = tableData.currentTurn === myTeamNumber;
+        
+        // Check submission status
+        const iHaveSubmitted = tableData.roundData && tableData.roundData[myTeamKey];
+        const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
+        
+        if (iHaveSubmitted && opponentHasSubmitted && !isCalculating) {
+            // Both teams have submitted - show results or wait for admin
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            document.getElementById('waiting-for-round').classList.add('hidden');
             
-            // Check if it's my turn
-            const isMyTurn = tableData.currentTurn === myTeamNumber;
-            
-            // Check submission status
-            const iHaveSubmitted = tableData.roundData && tableData.roundData[myTeamKey];
-            const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
-            
-            if (iHaveSubmitted && opponentHasSubmitted && !isCalculating) {
-                // Both teams have submitted - show results or wait for admin
-                document.getElementById('waiting-for-turn').classList.add('hidden');
-                document.getElementById('waiting-for-round').classList.add('hidden');
-                
-                if (adminState.controlMode === 'controlled') {
-                    if (adminState.showResults) {
-                        document.getElementById('admin-waiting').classList.add('hidden');
+            if (adminState.controlMode === 'controlled') {
+                if (adminState.showResults) {
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    
+                    // NEW: Check if results were already processed for this round
+                    if (tableData.resultsProcessed !== adminState.currentRound) {
                         isCalculating = true;
                         calculateResults(tableData);
-                    } else {
-                        document.getElementById('game-controls').classList.add('hidden');
-                        document.getElementById('admin-waiting').classList.remove('hidden');
-                        document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                    } else if (!showingResults) {
+                        // Results already processed for this round, just display them
+                        showingResults = true;
+                        displayPreviousResults(tableData);
                     }
                 } else {
-                    document.getElementById('admin-waiting').classList.add('hidden');
-                    isCalculating = true;
-                    calculateResults(tableData);
+                    document.getElementById('game-controls').classList.add('hidden');
+                    document.getElementById('admin-waiting').classList.remove('hidden');
+                    document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
                 }
-            } else if (iHaveSubmitted) {
-                // I've submitted, waiting for opponent
-                document.getElementById('game-controls').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.remove('hidden');
-                document.getElementById('waiting-for-round').classList.add('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-            } else if (isMyTurn) {
-                // It's my turn to play
-                document.getElementById('game-controls').classList.remove('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
-                document.getElementById('waiting-for-round').classList.add('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
             } else {
-                // It's not my turn, waiting for opponent to play
-                document.getElementById('game-controls').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.remove('hidden');
-                document.getElementById('waiting-for-round').classList.add('hidden');
                 document.getElementById('admin-waiting').classList.add('hidden');
-            }
-        }
-
-        function handleSimultaneousPlay(tableData) {
-            // Original logic for non-shared devices (simultaneous play)
-            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
-            
-            if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
-                // I've submitted, waiting for opponent
-                document.getElementById('game-controls').classList.add('hidden');
-                document.getElementById('waiting-for-round').classList.remove('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
-            } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
-                // Both teams have submitted
-                document.getElementById('waiting-for-round').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
                 
-                if (adminState.controlMode === 'controlled') {
-                    if (adminState.showResults) {
-                        document.getElementById('admin-waiting').classList.add('hidden');
-                        isCalculating = true;
-                        calculateResults(tableData);
-                    } else {
-                        document.getElementById('game-controls').classList.add('hidden');
-                        document.getElementById('admin-waiting').classList.remove('hidden');
-                        document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
-                    }
-                } else {
-                    document.getElementById('admin-waiting').classList.add('hidden');
+                // NEW: Check if results were already processed for this round
+                if (tableData.resultsProcessed !== adminState.currentRound) {
                     isCalculating = true;
                     calculateResults(tableData);
+                } else if (!showingResults) {
+                    // Results already processed for this round, just display them
+                    showingResults = true;
+                    displayPreviousResults(tableData);
                 }
-            } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
-                // Ready to play
-                document.getElementById('game-controls').classList.remove('hidden');
-                document.getElementById('waiting-for-round').classList.add('hidden');
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
             }
+        } else if (iHaveSubmitted) {
+            // I've submitted, waiting for opponent
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.remove('hidden');
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+        } else if (isMyTurn) {
+            // It's my turn to play
+            document.getElementById('game-controls').classList.remove('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+        } else {
+            // It's not my turn, waiting for opponent to play
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.remove('hidden');
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
         }
+    }
+
+    function handleSimultaneousPlay(tableData) {
+        // Original logic for non-shared devices (simultaneous play)
+        const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+        const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+        
+        if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
+            // I've submitted, waiting for opponent
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('waiting-for-round').classList.remove('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+        } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
+            // Both teams have submitted
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+            
+            if (adminState.controlMode === 'controlled') {
+                if (adminState.showResults) {
+                    document.getElementById('admin-waiting').classList.add('hidden');
+                    
+                    // NEW: Check if results were already processed for this round
+                    if (tableData.resultsProcessed !== adminState.currentRound) {
+                        isCalculating = true;
+                        calculateResults(tableData);
+                    } else if (!showingResults) {
+                        // Results already processed for this round, just display them
+                        showingResults = true;
+                        displayPreviousResults(tableData);
+                    }
+                } else {
+                    document.getElementById('game-controls').classList.add('hidden');
+                    document.getElementById('admin-waiting').classList.remove('hidden');
+                    document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                }
+            } else {
+                document.getElementById('admin-waiting').classList.add('hidden');
+                
+                // NEW: Check if results were already processed for this round
+                if (tableData.resultsProcessed !== adminState.currentRound) {
+                    isCalculating = true;
+                    calculateResults(tableData);
+                } else if (!showingResults) {
+                    // Results already processed for this round, just display them
+                    showingResults = true;
+                    displayPreviousResults(tableData);
+                }
+            }
+        } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
+            // Ready to play
+            document.getElementById('game-controls').classList.remove('hidden');
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('round-results').classList.add('hidden');
+            document.getElementById('admin-waiting').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+        }
+    }   
 
         function finalizeNegotiation() {
             const negotiatedAmount = document.getElementById('negotiated-contribution').value;
@@ -988,55 +1049,56 @@
             }
         }
 
-        async function calculateResults(tableData) {
-            const dataA = tableData.roundData.teamA;
-            const dataB = tableData.roundData.teamB;
-            
-            if (!dataA || !dataB) return;
-            
-            // Calculate public good returns
-            const totalContribution = dataA.actual + dataB.actual;
-            const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 = 0.75 per player
-            
-            // Calculate new budgets
-            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
-            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
-            
-            try {
-                // Update budgets in Firebase
-                const updates = {};
-                updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
-                updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
-                updates[`tables/${gameState.tableCode}/resultsProcessed`] = true;
-                
-                // Update team records
-                updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
-                updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
-                
-                // Get current round counts and increment
-                const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
-                const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
-                
-                updates[`teams/${tableData.teamA.name}/totalRounds`] = (teamASnapshot.val() || 0) + 1;
-                updates[`teams/${tableData.teamB.name}/totalRounds`] = (teamBSnapshot.val() || 0) + 1;
-                
-                await database.ref().update(updates);
-                
-                // Update local budget
-                gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
-                
-                // Display results
-                showResults(dataA, dataB, publicGoodReturn, tableData);
-                
-                // Reset calculation flag
-                isCalculating = false;
-                
-            } catch (error) {
-                console.error('Error updating results:', error);
-                showError('Error calculating results. Please refresh.');
-                isCalculating = false;
-            }
-        }
+async function calculateResults(tableData) {
+    const dataA = tableData.roundData.teamA;
+    const dataB = tableData.roundData.teamB;
+    
+    if (!dataA || !dataB) return;
+    
+    // Calculate public good returns
+    const totalContribution = dataA.actual + dataB.actual;
+    const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 = 0.75 per player
+    
+    // Calculate new budgets
+    const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
+    const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
+    
+    try {
+        // Update budgets in Firebase
+        const updates = {};
+        updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
+        updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
+        // CHANGE: Store the round number instead of just true
+        updates[`tables/${gameState.tableCode}/resultsProcessed`] = adminState.currentRound;
+        
+        // Update team records
+        updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
+        updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
+        
+        // Get current round counts and increment
+        const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
+        const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
+        
+        updates[`teams/${tableData.teamA.name}/totalRounds`] = (teamASnapshot.val() || 0) + 1;
+        updates[`teams/${tableData.teamB.name}/totalRounds`] = (teamBSnapshot.val() || 0) + 1;
+        
+        await database.ref().update(updates);
+        
+        // Update local budget
+        gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
+        
+        // Display results
+        showResults(dataA, dataB, publicGoodReturn, tableData);
+        
+        // Reset calculation flag
+        isCalculating = false;
+        
+    } catch (error) {
+        console.error('Error updating results:', error);
+        showError('Error calculating results. Please refresh.');
+        isCalculating = false;
+    }
+}
 
         function showResults(dataA, dataB, publicGoodReturn, tableData) {
             const team1Name = tableData.teamA.name;
@@ -1100,34 +1162,35 @@
             }
         }
 
-        async function nextRound() {
-            try {
-                const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
-                const tableSnapshot = await tableRef.once('value');
-                const tableData = tableSnapshot.val();
+    async function nextRound() {
+        try {
+            const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
+            const tableSnapshot = await tableRef.once('value');
+            const tableData = tableSnapshot.val();
+            
+            // Clear round data for this table but keep teams
+            await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).set({});
+            await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations`).set({});
+            // CHANGE: Remove resultsProcessed entirely instead of setting to null
+            await database.ref(`tables/${gameState.tableCode.toUpperCase()}/resultsProcessed`).remove();
+            
+            // For shared devices, alternate the round order and reset turn
+            if (tableData && tableData.isSharedDevice) {
+                const currentOrder = tableData.roundOrder || [1, 2];
+                const newOrder = [currentOrder[1], currentOrder[0]]; // Reverse the order
                 
-                // Clear round data for this table but keep teams
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).set({});
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations`).set({});
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/resultsProcessed`).set(null);
-                
-                // For shared devices, alternate the round order and reset turn
-                if (tableData && tableData.isSharedDevice) {
-                    const currentOrder = tableData.roundOrder || [1, 2];
-                    const newOrder = [currentOrder[1], currentOrder[0]]; // Reverse the order
-                    
-                    await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundOrder`).set(newOrder);
-                    await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(newOrder[0]);
-                }
-                
-                // Reset for new round
-                resetForNewRound();
-                
-            } catch (error) {
-                console.error('Error starting new round:', error);
-                showError('Error preparing new round. Please refresh if needed.');
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundOrder`).set(newOrder);
+                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(newOrder[0]);
             }
+            
+            // Reset for new round
+            resetForNewRound();
+            
+        } catch (error) {
+            console.error('Error starting new round:', error);
+            showError('Error preparing new round. Please refresh if needed.');
         }
+    }
 
         async function changeTable() {
             try {
