@@ -719,6 +719,27 @@
             handleForceTableReset();
             return;
             }
+
+            // Clear round results and reset UI if a new round has started
+            if (gameState.lastRoundDisplayed !== adminState.currentRound) {
+                gameState.lastRoundDisplayed = adminState.currentRound;
+
+                isCalculating = false;
+                showingResults = false;
+
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+
+                document.getElementById('contribution-phase').classList.add('hidden');
+                document.getElementById('negotiation-phase').classList.remove('hidden');
+
+                document.getElementById('my-negotiated').textContent = '--';
+                document.getElementById('opponent-negotiated').textContent = '--';
+                document.getElementById('negotiated-contribution').value = '0';
+                document.getElementById('actual-contribution').value = '0';
+            }
             
             // Show opponent registration button if this is a shared device table
             const opponentRegBtn = document.getElementById('opponent-registration-btn');
