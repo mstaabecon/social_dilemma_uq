@@ -332,120 +332,237 @@
             font-size: 14px;
             opacity: 0.9;
         }
+        
+        /* Login form styles */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .login-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-box h2 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .login-error {
+            display: none;
+            background: rgba(231, 76, 60, 0.2);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            color: white;
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .auth-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(76, 175, 80, 0.2);
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: #4CAF50;
+            font-weight: bold;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .auth-indicator button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🤝 The Social Dilemma - Admin</h1>
-        
-        <!-- Budget Configuration -->
-        <div class="budget-config">
-            <h3>📊 Game Configuration</h3>
-            <div class="budget-input-group">
-                <label for="initial-budget">Initial Budget:</label>
-                <input type="number" id="initial-budget" min="100" max="10000" step="100" value="1000">
-                <button onclick="updateInitialBudget()">Update Budget</button>
-            </div>
-            <small style="display: block; text-align: center; margin-top: 10px; opacity: 0.8;">
-                Current: <span id="current-budget-display">1000</span> | Changes only affect new teams
-            </small>
-        </div>
-        
-        <!-- Mode Controls -->
-        <div class="mode-controls">
-            <label>
-                <input type="radio" name="mode" value="free" onchange="changeControlMode()" id="mode-free">
-                Free Play Mode
-            </label>
-            <label>
-                <input type="radio" name="mode" value="controlled" onchange="changeControlMode()" id="mode-controlled">
-                Centrally Controlled Mode
-            </label>
-        </div>
-        
-        <!-- Shared Devices Toggle -->
-        <div class="mode-controls">
-            <label>
-                <input type="checkbox" id="shared-devices-toggle" onchange="toggleSharedDevices()">
-                Shared Devices Mode
-            </label>
-        </div>
-        
-        <!-- Leaderboard Toggle -->
-        <div class="mode-controls">
-            <label>
-                <input type="checkbox" id="leaderboard-toggle" onchange="toggleLeaderboard()">
-                Enable Public Leaderboard
-            </label>
-        </div>
-        
-        <!-- Round Info -->
-        <div class="round-info">
-            <h2>Round <span id="current-round">1</span> - Results: <span id="results-status">Hidden</span></h2>
-            <div class="table-summary">
-                <span id="active-tables">0</span> active tables, 
-                <span id="completed-tables">0</span> completed this round,
-                <span id="waiting-next-round">0</span> waiting for next round
-            </div>
-        </div>
-        
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="stat-active-tables">0</div>
-                <div class="stat-label">Active Tables</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-total-teams">0</div>
-                <div class="stat-label">Total Teams</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-avg-budget">1000</div>
-                <div class="stat-label">Average Budget</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-max-budget">1000</div>
-                <div class="stat-label">Max Budget</div>
-            </div>
-        </div>
-        
-        <!-- Admin Actions -->
-        <div class="admin-actions">
-            <div class="controlled-only">
-                <button class="button button-primary" onclick="toggleResultsDisplay()" id="toggle-results-btn">
-                    Show Results to Students
+    <div id="app">
+        <!-- Login Form (shown when not authenticated) -->
+        <div id="login-section" class="login-container" style="display: none;">
+            <div class="login-box">
+                <h2>🔐 Admin Login</h2>
+                
+                <div id="login-error" class="login-error"></div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="admin-email" placeholder="admin">
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="admin-password" placeholder="Enter password">
+                </div>
+                
+                <button class="button button-primary" style="width: 100%;" onclick="adminLogin()">
+                    Login as Admin
                 </button>
-                <button class="button button-secondary" onclick="startNextRound()" id="next-round-btn">
-                    Start Next Round
-                </button>
-            </div>
-            <button class="button button-warning" onclick="resetAllTables()" id="reset-btn">
-                Reset All Tables & Force Re-pairing
-            </button>
-            <button class="button button-secondary" onclick="finaliseScores()">
-                Finalise Scores & Award Prizes
-            </button>
-            <button class="button button-secondary" onclick="changePassword()">
-                Change Admin Password
-            </button>
-            <button class="button button-secondary" onclick="exportData()">
-                Export Game Data
-            </button>
-        </div>
-        
-        <!-- Active Tables -->
-        <div class="table-list">
-            <h3>Active Tables</h3>
-            <div id="tables-container">
-                <div class="empty-state">No active tables</div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <a href="index.html" style="color: #4CAF50; text-decoration: none;">
+                        ← Back to Game
+                    </a>
+                </div>
             </div>
         </div>
-        
-        <!-- Teams List -->
-        <div class="teams-list">
-            <h3>All Teams</h3>
-            <div id="teams-container">
-                <div class="empty-state">No teams registered</div>
+
+        <!-- Admin Interface (shown when authenticated) -->
+        <div id="admin-section" style="display: none;">
+            <div class="auth-indicator">
+                🔒 <span id="admin-email-display"></span>
+                <button onclick="adminLogout()">Logout</button>
+            </div>
+
+            <div class="container">
+                <h1>🤝 The Social Dilemma - Admin</h1>
+                
+                <!-- Budget Configuration -->
+                <div class="budget-config">
+                    <h3>📊 Game Configuration</h3>
+                    <div class="budget-input-group">
+                        <label for="initial-budget">Initial Budget:</label>
+                        <input type="number" id="initial-budget" min="100" max="10000" step="100" value="1000">
+                        <button onclick="updateInitialBudget()">Update Budget</button>
+                    </div>
+                    <small style="display: block; text-align: center; margin-top: 10px; opacity: 0.8;">
+                        Current: <span id="current-budget-display">1000</span> | Changes only affect new teams
+                    </small>
+                </div>
+                
+                <!-- Mode Controls -->
+                <div class="mode-controls">
+                    <label>
+                        <input type="radio" name="mode" value="free" onchange="changeControlMode()" id="mode-free">
+                        Free Play Mode
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="controlled" onchange="changeControlMode()" id="mode-controlled">
+                        Centrally Controlled Mode
+                    </label>
+                </div>
+                
+                <!-- Shared Devices Toggle -->
+                <div class="mode-controls">
+                    <label>
+                        <input type="checkbox" id="shared-devices-toggle" onchange="toggleSharedDevices()">
+                        Shared Devices Mode
+                    </label>
+                </div>
+                
+                <!-- Leaderboard Toggle -->
+                <div class="mode-controls">
+                    <label>
+                        <input type="checkbox" id="leaderboard-toggle" onchange="toggleLeaderboard()">
+                        Enable Public Leaderboard
+                    </label>
+                </div>
+                
+                <!-- Round Info -->
+                <div class="round-info">
+                    <h2>Round <span id="current-round">1</span> - Results: <span id="results-status">Hidden</span></h2>
+                    <div class="table-summary">
+                        <span id="active-tables">0</span> active tables, 
+                        <span id="completed-tables">0</span> completed this round,
+                        <span id="waiting-next-round">0</span> waiting for next round
+                    </div>
+                </div>
+                
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-active-tables">0</div>
+                        <div class="stat-label">Active Tables</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-teams">0</div>
+                        <div class="stat-label">Total Teams</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-avg-budget">1000</div>
+                        <div class="stat-label">Average Budget</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-max-budget">1000</div>
+                        <div class="stat-label">Max Budget</div>
+                    </div>
+                </div>
+                
+                <!-- Admin Actions -->
+                <div class="admin-actions">
+                    <div class="controlled-only">
+                        <button class="button button-primary" onclick="toggleResultsDisplay()" id="toggle-results-btn">
+                            Show Results to Students
+                        </button>
+                        <button class="button button-secondary" onclick="startNextRound()" id="next-round-btn">
+                            Start Next Round
+                        </button>
+                    </div>
+                    <button class="button button-warning" onclick="resetAllTables()" id="reset-btn">
+                        Reset All Tables & Force Re-pairing
+                    </button>
+                    <button class="button button-secondary" onclick="finaliseScores()">
+                        Finalise Scores & Award Prizes
+                    </button>
+                    <button class="button button-secondary" onclick="exportData()">
+                        Export Game Data
+                    </button>
+                </div>
+                
+                <!-- Active Tables -->
+                <div class="table-list">
+                    <h3>Active Tables</h3>
+                    <div id="tables-container">
+                        <div class="empty-state">No active tables</div>
+                    </div>
+                </div>
+                
+                <!-- Teams List -->
+                <div class="teams-list">
+                    <h3>All Teams</h3>
+                    <div id="teams-container">
+                        <div class="empty-state">No teams registered</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -453,10 +570,11 @@
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
     <script>
         // Game Configuration
-        const INITIAL_BUDGET = 1000; // Default initial budget for new teams
+        const INITIAL_BUDGET = 1000;
         
         // Firebase configuration
         const firebaseConfig = {
@@ -472,6 +590,10 @@
         // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+        const auth = firebase.auth();
+
+        // Current user
+        let currentUser = null;
 
         // Admin state
         let adminState = {
@@ -481,20 +603,104 @@
             allowNewRounds: true,
             processingResults: false,
             forceTableReset: false,
-            adminPassword: 'admin123',
             sharedDevices: false,
             leaderboardEnabled: false,
             resetTimestamp: Date.now(),
-            initialBudget: INITIAL_BUDGET // Store configurable initial budget
+            initialBudget: INITIAL_BUDGET
         };
 
         let tables = {};
         let teams = {};
 
+        // Initialize auth listener
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // User is signed in
+                currentUser = user;
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'block';
+                document.getElementById('admin-email-display').textContent = user.email;
+                initializeAdmin();
+            } else {
+                // User is signed out
+                currentUser = null;
+                document.getElementById('login-section').style.display = 'flex';
+                document.getElementById('admin-section').style.display = 'none';
+            }
+        });
+
+        // Admin login
+        async function adminLogin() {
+            const email = document.getElementById('admin-email').value;
+            const password = document.getElementById('admin-password').value;
+            const errorDiv = document.getElementById('login-error');
+            
+            if (!email || !password) {
+                errorDiv.textContent = 'Please enter both email and password';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // Auth state change listener will handle the rest
+            } catch (error) {
+                console.error('Login error:', error);
+                
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        errorDiv.textContent = 'Admin account not found';
+                        break;
+                    case 'auth/wrong-password':
+                        errorDiv.textContent = 'Incorrect password';
+                        break;
+                    case 'auth/invalid-email':
+                        errorDiv.textContent = 'Invalid email format';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorDiv.textContent = 'Too many failed attempts. Please try again later.';
+                        break;
+                    default:
+                        errorDiv.textContent = 'Login failed. Please check your credentials.';
+                }
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Admin logout
+        async function adminLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    await auth.signOut();
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Error logging out. Please try again.');
+                }
+            }
+        }
+
+        // Secure admin operation wrapper
+        async function secureAdminOperation(operation) {
+            if (!currentUser) {
+                alert('Please login as admin first');
+                return;
+            }
+            
+            try {
+                return await operation();
+            } catch (error) {
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Permission denied. Please ensure you are logged in as admin.');
+                    console.error('Permission error:', error);
+                } else {
+                    throw error;
+                }
+            }
+        }
+
         // Initialize admin interface
         async function initializeAdmin() {
             try {
-                // Initialize admin state if it doesn't exist
                 const adminRef = database.ref('admin');
                 const adminSnapshot = await adminRef.once('value');
                 
@@ -502,18 +708,15 @@
                     await adminRef.set(adminState);
                 } else {
                     adminState = { ...adminState, ...adminSnapshot.val() };
-                    // Ensure initial budget is set if not present
                     if (!adminState.initialBudget) {
                         adminState.initialBudget = INITIAL_BUDGET;
                         await adminRef.child('initialBudget').set(INITIAL_BUDGET);
                     }
                 }
                 
-                // Update UI with current budget
                 document.getElementById('initial-budget').value = adminState.initialBudget;
                 document.getElementById('current-budget-display').textContent = adminState.initialBudget;
                 
-                // Set up listeners
                 setupListeners();
                 updateUI();
                 
@@ -523,12 +726,10 @@
         }
 
         function setupListeners() {
-            // Listen to admin state changes
             database.ref('admin').on('value', (snapshot) => {
                 if (snapshot.exists()) {
                     adminState = snapshot.val();
                     updateUI();
-                    // Update budget display
                     if (adminState.initialBudget) {
                         document.getElementById('initial-budget').value = adminState.initialBudget;
                         document.getElementById('current-budget-display').textContent = adminState.initialBudget;
@@ -536,14 +737,12 @@
                 }
             });
             
-            // Listen to tables
             database.ref('tables').on('value', (snapshot) => {
                 tables = snapshot.val() || {};
                 updateTablesDisplay();
                 updateStats();
             });
             
-            // Listen to teams
             database.ref('teams').on('value', (snapshot) => {
                 teams = snapshot.val() || {};
                 updateTeamsDisplay();
@@ -552,56 +751,43 @@
         }
 
         async function updateInitialBudget() {
-            const newBudget = parseInt(document.getElementById('initial-budget').value);
-            
-            if (newBudget < 100 || newBudget > 10000 || newBudget % 100 !== 0) {
-                alert('Budget must be between 100 and 10000, and a multiple of 100');
-                document.getElementById('initial-budget').value = adminState.initialBudget;
-                return;
-            }
-            
-            try {
+            return secureAdminOperation(async () => {
+                const newBudget = parseInt(document.getElementById('initial-budget').value);
+                
+                if (newBudget < 100 || newBudget > 10000 || newBudget % 100 !== 0) {
+                    alert('Budget must be between 100 and 10000, and a multiple of 100');
+                    document.getElementById('initial-budget').value = adminState.initialBudget;
+                    return;
+                }
+                
                 await database.ref('admin/initialBudget').set(newBudget);
                 document.getElementById('current-budget-display').textContent = newBudget;
                 alert(`Initial budget updated to ${newBudget}. This will affect new teams only.`);
-            } catch (error) {
-                console.error('Error updating initial budget:', error);
-                alert('Error updating budget. Please try again.');
-            }
+            });
         }
 
         function updateUI() {
-            // Update mode radio buttons
             document.getElementById('mode-free').checked = adminState.controlMode === 'free';
             document.getElementById('mode-controlled').checked = adminState.controlMode === 'controlled';
-            
-            // Update shared devices toggle
             document.getElementById('shared-devices-toggle').checked = adminState.sharedDevices || false;
-            
-            // Update leaderboard toggle
             document.getElementById('leaderboard-toggle').checked = adminState.leaderboardEnabled || false;
             
-            // Update body class for conditional styling
             document.body.className = adminState.controlMode === 'controlled' ? 'controlled-mode' : '';
             
-            // Update round and results status display
             document.getElementById('current-round').textContent = adminState.currentRound || 1;
             document.getElementById('results-status').textContent = adminState.showResults ? 'Visible' : 'Hidden';
             
-            // Update button states
             const toggleResultsBtn = document.getElementById('toggle-results-btn');
             const nextRoundBtn = document.getElementById('next-round-btn');
             
             if (adminState.controlMode === 'controlled') {
                 if (!adminState.showResults) {
-                    // Results are hidden
                     toggleResultsBtn.textContent = 'Show Results to Students';
                     toggleResultsBtn.disabled = false;
                     toggleResultsBtn.className = 'button button-primary';
                     nextRoundBtn.textContent = 'Start Next Round';
                     nextRoundBtn.disabled = false;
                 } else {
-                    // Results are visible
                     toggleResultsBtn.textContent = 'Hide Results from Students';
                     toggleResultsBtn.disabled = false;
                     toggleResultsBtn.className = 'button button-warning';
@@ -651,7 +837,6 @@
                 return;
             }
             
-            // Sort teams by budget (descending)
             teamsList.sort(([,a], [,b]) => (b.budget || adminState.initialBudget) - (a.budget || adminState.initialBudget));
             
             let html = '';
@@ -729,9 +914,9 @@
 
         // Admin Functions
         async function changeControlMode() {
-            const selectedMode = document.querySelector('input[name="mode"]:checked').value;
-            
-            try {
+            return secureAdminOperation(async () => {
+                const selectedMode = document.querySelector('input[name="mode"]:checked').value;
+                
                 const updates = {
                     'admin/controlMode': selectedMode,
                     'admin/showResults': false
@@ -742,42 +927,28 @@
                 }
                 
                 await database.ref().update(updates);
-                
-            } catch (error) {
-                console.error('Error changing control mode:', error);
-            }
+            });
         }
 
         async function toggleSharedDevices() {
-            const isSharedDevices = document.getElementById('shared-devices-toggle').checked;
-            
-            try {
+            return secureAdminOperation(async () => {
+                const isSharedDevices = document.getElementById('shared-devices-toggle').checked;
                 await database.ref('admin/sharedDevices').set(isSharedDevices);
-                
-            } catch (error) {
-                console.error('Error toggling shared devices mode:', error);
-                alert('Error updating shared devices mode. Check console for details.');
-            }
+            });
         }
 
         async function toggleLeaderboard() {
-            const isLeaderboardEnabled = document.getElementById('leaderboard-toggle').checked;
-            
-            try {
+            return secureAdminOperation(async () => {
+                const isLeaderboardEnabled = document.getElementById('leaderboard-toggle').checked;
                 await database.ref('admin/leaderboardEnabled').set(isLeaderboardEnabled);
-                
-            } catch (error) {
-                console.error('Error toggling leaderboard:', error);
-                alert('Error updating leaderboard setting. Check console for details.');
-            }
+            });
         }
 
         async function toggleResultsDisplay() {
-            try {
+            return secureAdminOperation(async () => {
                 const newShowResults = !adminState.showResults;
                 
                 if (newShowResults) {
-                    // Showing results - process all completed tables
                     const updates = {};
                     let processedCount = 0;
                     
@@ -785,7 +956,6 @@
                         const tableData = tables[tableCode];
                         
                         if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
-                            // Calculate results
                             const dataA = tableData.roundData.teamA;
                             const dataB = tableData.roundData.teamB;
                             const totalContribution = dataA.actual + dataB.actual;
@@ -794,17 +964,13 @@
                             const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
                             const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
                             
-                            // Update budgets
                             updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
                             updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
-                            // ADDITION: Mark results as processed for this round
                             updates[`tables/${tableCode}/resultsProcessed`] = adminState.currentRound || 1;
                             
-                            // Update team records
                             updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
                             updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
                             
-                            // Only increment rounds if this is a new round for the team
                             const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
                             const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
                             const currentAdminRound = adminState.currentRound || 1;
@@ -820,7 +986,6 @@
                         }
                     }
                     
-                    // Set results as visible
                     updates['admin/showResults'] = true;
                     
                     await database.ref().update(updates);
@@ -831,37 +996,28 @@
                         alert('Results display toggled, but no completed tables to show results for.');
                     }
                 } else {
-                    // Hiding results (probably rare, but possible)
                     await database.ref('admin/showResults').set(false);
                     alert('Results are now hidden from students.');
                 }
-                
-            } catch (error) {
-                console.error('Error toggling results display:', error);
-                alert('Error toggling results display. Check console for details.');
-            }
+            });
         }
 
         async function startNextRound() {
-            try {
+            return secureAdminOperation(async () => {
                 const updates = {};
                 
-                // Clear all round data but keep teams at tables
                 for (let tableCode in tables) {
                     updates[`tables/${tableCode}/roundData`] = null;
                     updates[`tables/${tableCode}/negotiations`] = null;
                     updates[`tables/${tableCode}/resultsProcessed`] = null;
                     
-                    // Reset shared device turn tracking if applicable
                     if (tables[tableCode].isSharedDevice) {
-                        // Randomize starting order for new round
                         const randomOrder = Math.random() < 0.5 ? [1, 2] : [2, 1];
                         updates[`tables/${tableCode}/roundOrder`] = randomOrder;
                         updates[`tables/${tableCode}/currentTurn`] = randomOrder[0];
                     }
                 }
                 
-                // Update admin state for new round
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
                 updates['admin/showResults'] = false;
                 updates['admin/allowNewRounds'] = true;
@@ -870,29 +1026,22 @@
                 await database.ref().update(updates);
                 
                 alert(`New round started! All teams can now negotiate and play.`);
-                
-            } catch (error) {
-                console.error('Error starting next round:', error);
-                alert('Error starting next round. Check console for details.');
-            }
+            });
         }
 
         async function resetAllTables() {
-            if (!confirm('This will remove all teams from tables and force them to find new partners. All round data will be cleared and a new round will start. Continue?')) {
-                return;
-            }
-            
-            try {
+            return secureAdminOperation(async () => {
+                if (!confirm('This will remove all teams from tables and force them to find new partners. All round data will be cleared and a new round will start. Continue?')) {
+                    return;
+                }
+                
                 const resetTimestamp = Date.now();
                 
-                // Set force reset flag with timestamp
                 await database.ref('admin/forceTableReset').set(true);
                 await database.ref('admin/resetTimestamp').set(resetTimestamp);
                 
-                // Clear ALL table data completely
                 await database.ref('tables').set({});
                 
-                // Clear current table references from all teams
                 const teamsUpdate = {};
                 for (let teamName in teams) {
                     teamsUpdate[`teams/${teamName}/currentTable`] = null;
@@ -902,10 +1051,8 @@
                     await database.ref().update(teamsUpdate);
                 }
                 
-                // Start new round automatically (increment round number)
                 const newRound = (adminState.currentRound || 1) + 1;
                 
-                // Reset admin state with new round
                 await database.ref().update({
                     'admin/currentRound': newRound,
                     'admin/currentPhase': 'playing',
@@ -913,59 +1060,20 @@
                     'admin/processingResults': false
                 });
                 
-                // Reset the force flag after a delay
                 setTimeout(async () => {
                     await database.ref('admin/forceTableReset').set(false);
                 }, 3000);
                 
                 alert(`All tables completely reset! Teams must now re-pair for Round ${newRound}.`);
-                
-            } catch (error) {
-                console.error('Error resetting tables:', error);
-                alert('Error resetting tables. Check console for details.');
-            }
-        }
-
-        async function changePassword() {
-            const currentPasswordRef = database.ref('admin/adminPassword');
-            
-            try {
-                const currentPasswordSnapshot = await currentPasswordRef.once('value');
-                const currentPassword = currentPasswordSnapshot.val() || 'admin123';
-                
-                const enteredCurrentPassword = prompt("Enter current admin password:");
-                if (enteredCurrentPassword !== currentPassword) {
-                    alert("Incorrect current password.");
-                    return;
-                }
-                
-                const newPassword = prompt("Enter new admin password:");
-                if (!newPassword || newPassword.trim() === '') {
-                    alert("Password cannot be empty.");
-                    return;
-                }
-                
-                const confirmPassword = prompt("Confirm new admin password:");
-                if (newPassword !== confirmPassword) {
-                    alert("Passwords do not match.");
-                    return;
-                }
-                
-                await currentPasswordRef.set(newPassword);
-                alert("Admin password changed successfully!");
-                
-            } catch (error) {
-                console.error('Error changing password:', error);
-                alert('Error changing password. Check console for details.');
-            }
+            });
         }
 
         async function finaliseScores() {
-            if (!confirm('This will finalise the game scores and award prizes. This action cannot be undone. Continue?')) {
-                return;
-            }
-            
-            try {
+            return secureAdminOperation(async () => {
+                if (!confirm('This will finalise the game scores and award prizes. This action cannot be undone. Continue?')) {
+                    return;
+                }
+                
                 const updates = {};
                 const teamsList = Object.entries(teams);
                 
@@ -976,10 +1084,8 @@
                 
                 const defaultBudget = adminState.initialBudget || INITIAL_BUDGET;
                 
-                // Sort teams by budget (descending)
                 teamsList.sort(([,a], [,b]) => (b.budget || defaultBudget) - (a.budget || defaultBudget));
                 
-                // Check if there's a tie for first place
                 const firstPlaceBudget = teamsList[0][1].budget || defaultBudget;
                 const tiedForFirst = teamsList.filter(([,teamData]) => 
                     (teamData.budget || defaultBudget) === firstPlaceBudget
@@ -989,17 +1095,14 @@
                 let isRandomPrize = false;
                 
                 if (tiedForFirst.length > 1) {
-                    // Tie for first place - break tie to determine 1st and 2nd
                     const shuffledTied = [...tiedForFirst].sort(() => Math.random() - 0.5);
-                    firstPlaceWinner = shuffledTied[0][0]; // First team name
-                    secondPlaceWinner = shuffledTied[1][0]; // Second team name
-                    isRandomPrize = false; // This is earned 2nd place, not random
+                    firstPlaceWinner = shuffledTied[0][0];
+                    secondPlaceWinner = shuffledTied[1][0];
+                    isRandomPrize = false;
                     
-                    // Give +1 to first place winner to break the tie
                     const firstPlaceBudgetNew = (shuffledTied[0][1].budget || defaultBudget) + 1;
                     updates[`teams/${firstPlaceWinner}/budget`] = firstPlaceBudgetNew;
                     
-                    // Update table references if they exist
                     Object.entries(tables).forEach(([tableCode, tableData]) => {
                         if (tableData.teamA && tableData.teamA.name === firstPlaceWinner) {
                             updates[`tables/${tableCode}/teamA/budget`] = firstPlaceBudgetNew;
@@ -1010,15 +1113,13 @@
                     });
                     
                 } else {
-                    // Clear winner - randomly select second place from all other teams
-                    firstPlaceWinner = teamsList[0][0]; // First team name
-                    const otherTeams = teamsList.slice(1); // All teams except first
+                    firstPlaceWinner = teamsList[0][0];
+                    const otherTeams = teamsList.slice(1);
                     const randomIndex = Math.floor(Math.random() * otherTeams.length);
-                    secondPlaceWinner = otherTeams[randomIndex][0]; // Random team name
-                    isRandomPrize = true; // This is a random prize
+                    secondPlaceWinner = otherTeams[randomIndex][0];
+                    isRandomPrize = true;
                 }
                 
-                // Store the results in admin state
                 updates['admin/gameFinalized'] = true;
                 updates['admin/firstPlaceWinner'] = firstPlaceWinner;
                 updates['admin/secondPlaceWinner'] = secondPlaceWinner;
@@ -1029,15 +1130,11 @@
                 
                 const prizeType = isRandomPrize ? 'Random Prize' : 'Second Place';
                 alert(`Scores finalized!\n\n🥇 First Place: ${firstPlaceWinner}\n${isRandomPrize ? '🎲' : '🥈'} ${prizeType}: ${secondPlaceWinner}`);
-                
-            } catch (error) {
-                console.error('Error finalizing scores:', error);
-                alert('Error finalizing scores. Check console for details.');
-            }
+            });
         }
 
         async function exportData() {
-            try {
+            return secureAdminOperation(async () => {
                 const data = {
                     exportTime: new Date().toISOString(),
                     adminState: adminState,
@@ -1054,49 +1151,19 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                
-            } catch (error) {
-                console.error('Error exporting data:', error);
-                alert('Error exporting data. Check console for details.');
-            }
+            });
         }
 
-        // Simple admin access check
-        async function checkAdminAccess() {
-            try {
-                // Get current password from database
-                const passwordRef = database.ref('admin/adminPassword');
-                const passwordSnapshot = await passwordRef.once('value');
-                const currentPassword = passwordSnapshot.val() || 'admin123';
-                
-                const enteredPassword = prompt("Enter admin password:");
-                if (enteredPassword !== currentPassword) {
-                    alert("Access denied");
-                    window.location.href = "index.html";
-                    return false;
-                }
-                return true;
-            } catch (error) {
-                console.error('Error checking admin access:', error);
-                // Fallback to default password if database error
-                const enteredPassword = prompt("Enter admin password:");
-                if (enteredPassword !== 'admin123') {
-                    alert("Access denied");
-                    window.location.href = "index.html";
-                    return false;
-                }
-                return true;
-            }
-        }
-
-        // Initialize when page loads
-        window.addEventListener('load', async () => {
-            if (await checkAdminAccess()) {
-                initializeAdmin();
-            }
+        // Add enter key support for login
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('admin-password').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') adminLogin();
+            });
         });
 
         // Make functions globally accessible
+        window.adminLogin = adminLogin;
+        window.adminLogout = adminLogout;
         window.changeControlMode = changeControlMode;
         window.toggleSharedDevices = toggleSharedDevices;
         window.toggleLeaderboard = toggleLeaderboard;
@@ -1104,7 +1171,6 @@
         window.startNextRound = startNextRound;
         window.resetAllTables = resetAllTables;
         window.finaliseScores = finaliseScores;
-        window.changePassword = changePassword;
         window.exportData = exportData;
         window.updateInitialBudget = updateInitialBudget;
     </script>
