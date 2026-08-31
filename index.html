@@ -574,20 +574,23 @@
             if (adminState.controlMode === 'controlled') {
                 handleControlledMode();
                 
-                // Check if admin just enabled results display and we have complete round data
-                if (adminState.showResults && !showingResults) {
-                    if (currentTableRef) {
-                        currentTableRef.once('value').then((snapshot) => {
-                            const tableData = snapshot.val();
-                            if (tableData && tableData.roundData && 
-                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
-                                isCalculating = true;
-                                calculateResults(tableData);
-                            }
-                        }).catch((error) => {
-                            console.error('Error checking table data:', error);
-                        });
-                    }
+                // FIX: the admin writes the results payload and admin/showResults in one
+                // update, but they arrive as two independent listener callbacks in no
+                // guaranteed order. If the table callback lands first, showResults is still
+                // false locally and we park on "waiting for instructor" - and nothing ever
+                // re-triggers, because the table data doesn't change again.
+                // So re-run the normal table evaluation here instead of recomputing:
+                // updateGameState renders stored results if they exist, and only falls back
+                // to calculating when they don't.
+                if (adminState.showResults && !showingResults && currentTableRef) {
+                    currentTableRef.once('value').then((snapshot) => {
+                        const tableData = snapshot.val();
+                        if (tableData) {
+                            updateGameState(tableData);
+                        }
+                    }).catch((error) => {
+                        console.error('Error checking table data:', error);
+                    });
                 }
             }
         }
@@ -1059,8 +1062,16 @@
                 });
 
                 if (!claim.committed) {
+                    // Someone else (the other team, or the instructor in controlled mode)
+                    // already computed this round. Render THEIR numbers - never recompute,
+                    // or the payoff gets applied twice.
                     isCalculating = false;
-                    return; // the listener will deliver `results` and we'll render them
+                    const existing = await tableRef.once('value');
+                    const fresh = existing.val();
+                    if (fresh && fresh.results) {
+                        applyStoredResults(fresh);
+                    }
+                    return;
                 }
 
                 const totalContribution = dataA.actual + dataB.actual;
