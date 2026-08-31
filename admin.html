@@ -541,7 +541,7 @@
                         Reset All Tables & Force Re-pairing
                     </button>
                     <button class="button button-secondary" onclick="finaliseScores()">
-                        Finalise Scores & Award Prizes
+                        Finalise Scores & Award Prize
                     </button>
                     <button class="button button-secondary" onclick="exportData()">
                         Export Game Data
@@ -1172,15 +1172,15 @@
 
         async function finaliseScores() {
             return secureAdminOperation(async () => {
-                if (!confirm('This will finalise the game scores and award prizes. This action cannot be undone. Continue?')) {
+                if (!confirm('This will finalise the game and award the prize. This action cannot be undone. Continue?')) {
                     return;
                 }
                 
                 const updates = {};
                 const teamsList = Object.entries(teams);
                 
-                if (teamsList.length < 2) {
-                    alert('Need at least 2 teams to finalise scores.');
+                if (teamsList.length < 1) {
+                    alert('No teams to finalise.');
                     return;
                 }
                 
@@ -1188,50 +1188,48 @@
                 
                 teamsList.sort(([,a], [,b]) => (b.budget || defaultBudget) - (a.budget || defaultBudget));
                 
-                const firstPlaceBudget = teamsList[0][1].budget || defaultBudget;
-                const tiedForFirst = teamsList.filter(([,teamData]) => 
-                    (teamData.budget || defaultBudget) === firstPlaceBudget
+                const topBudget = teamsList[0][1].budget || defaultBudget;
+                const tiedForFirst = teamsList.filter(([,teamData]) =>
+                    (teamData.budget || defaultBudget) === topBudget
                 );
                 
-                let firstPlaceWinner, secondPlaceWinner;
-                let isRandomPrize = false;
+                // Single prize: highest budget wins. A tie is broken at random, and the
+                // winner is nudged by +1 so the leaderboard shows one clear rank 1.
+                let winner;
+                let wasTied = false;
                 
                 if (tiedForFirst.length > 1) {
-                    const shuffledTied = [...tiedForFirst].sort(() => Math.random() - 0.5);
-                    firstPlaceWinner = shuffledTied[0][0];
-                    secondPlaceWinner = shuffledTied[1][0];
-                    isRandomPrize = false;
+                    wasTied = true;
+                    const shuffled = [...tiedForFirst].sort(() => Math.random() - 0.5);
+                    winner = shuffled[0][0];
                     
-                    const firstPlaceBudgetNew = (shuffledTied[0][1].budget || defaultBudget) + 1;
-                    updates[`teams/${firstPlaceWinner}/budget`] = firstPlaceBudgetNew;
+                    const winnerBudget = topBudget + 1;
+                    updates[`teams/${winner}/budget`] = winnerBudget;
                     
                     Object.entries(tables).forEach(([tableCode, tableData]) => {
-                        if (tableData.teamA && tableData.teamA.name === firstPlaceWinner) {
-                            updates[`tables/${tableCode}/teamA/budget`] = firstPlaceBudgetNew;
+                        if (tableData.teamA && tableData.teamA.name === winner) {
+                            updates[`tables/${tableCode}/teamA/budget`] = winnerBudget;
                         }
-                        if (tableData.teamB && tableData.teamB.name === firstPlaceWinner) {
-                            updates[`tables/${tableCode}/teamB/budget`] = firstPlaceBudgetNew;
+                        if (tableData.teamB && tableData.teamB.name === winner) {
+                            updates[`tables/${tableCode}/teamB/budget`] = winnerBudget;
                         }
                     });
-                    
                 } else {
-                    firstPlaceWinner = teamsList[0][0];
-                    const otherTeams = teamsList.slice(1);
-                    const randomIndex = Math.floor(Math.random() * otherTeams.length);
-                    secondPlaceWinner = otherTeams[randomIndex][0];
-                    isRandomPrize = true;
+                    winner = teamsList[0][0];
                 }
                 
                 updates['admin/gameFinalized'] = true;
-                updates['admin/firstPlaceWinner'] = firstPlaceWinner;
-                updates['admin/secondPlaceWinner'] = secondPlaceWinner;
-                updates['admin/isRandomPrize'] = isRandomPrize;
+                updates['admin/firstPlaceWinner'] = winner;
+                // Clear the old two-prize fields so a previous session can't resurrect
+                // a second/random prize on the leaderboard.
+                updates['admin/secondPlaceWinner'] = null;
+                updates['admin/isRandomPrize'] = null;
                 updates['admin/finalizationTimestamp'] = serverNow();
                 
                 await database.ref().update(updates);
                 
-                const prizeType = isRandomPrize ? 'Random Prize' : 'Second Place';
-                alert(`Scores finalized!\n\n🥇 First Place: ${firstPlaceWinner}\n${isRandomPrize ? '🎲' : '🥈'} ${prizeType}: ${secondPlaceWinner}`);
+                alert(`Scores finalised!\n\n🏆 Winner: ${winner}` +
+                      (wasTied ? `\n\n(${tiedForFirst.length} teams were tied on ${topBudget} - winner drawn at random.)` : ''));
             });
         }
 

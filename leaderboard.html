@@ -245,7 +245,7 @@
             
             <!-- Prize Winners Display (only when finalized) -->
             <div id="prize-winners" class="teams-list" style="display: none; margin-bottom: 30px; background: rgba(255, 215, 0, 0.1); border: 2px solid #FFD700;">
-                <h3 style="color: #FFD700;">🎉 Prize Winners</h3>
+                <h3 style="color: #FFD700;">🎉 Prize Winner</h3>
                 <div id="prize-winners-content"></div>
             </div>
             
@@ -383,11 +383,9 @@
             // Check if scores have been finalized
             const isFinalized = adminState.gameFinalized;
             const firstPlaceWinner = adminState.firstPlaceWinner;
-            const secondPlaceWinner = adminState.secondPlaceWinner;
-            const isRandomPrize = adminState.isRandomPrize;
             
-            // Update prize winners display
-            updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, secondPlaceWinner, isRandomPrize);
+            // Update prize winner display (single prize)
+            updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner);
             
             let html = '';
             let currentRank = 1;
@@ -411,20 +409,8 @@
                     if (teamName === firstPlaceWinner) {
                         itemClass = 'rank-1';
                         rankClass = 'rank-1';
-                        trophy = '🥇';
+                        trophy = '🏆';
                         displayRank = '1st';
-                    } else if (teamName === secondPlaceWinner) {
-                        if (isRandomPrize) {
-                            itemClass = 'random-prize';
-                            rankClass = 'random-prize';
-                            trophy = '🎲';
-                            displayRank = 'Prize';
-                        } else {
-                            itemClass = 'rank-2';
-                            rankClass = 'rank-2';
-                            trophy = '🥈';
-                            displayRank = '2nd';
-                        }
                     } else {
                         displayRank = currentRank;
                     }
@@ -456,27 +442,16 @@
             container.innerHTML = html;
         }
 
-        function updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner, secondPlaceWinner, isRandomPrize) {
+        function updatePrizeWinnersDisplay(isFinalized, firstPlaceWinner) {
             const prizeWinnersDiv = document.getElementById('prize-winners');
             const prizeContent = document.getElementById('prize-winners-content');
             
-            if (isFinalized && firstPlaceWinner && secondPlaceWinner) {
-                const secondPrizeIcon = isRandomPrize ? '🎲' : '🥈';
-                const secondPrizeTitle = isRandomPrize ? 'Random Prize' : 'Second Place';
-                const secondPrizeColor = isRandomPrize ? '#9C27B0' : '#C0C0C0';
-                
+            if (isFinalized && firstPlaceWinner) {
                 prizeContent.innerHTML = `
-                    <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px; padding: 10px;">
-                        <div style="text-align: center; background: rgba(255, 215, 0, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
-                            <div style="font-size: 24px; margin-bottom: 5px;">🥇</div>
-                            <div style="font-weight: bold; font-size: 18px; color: #FFD700;">First Place</div>
-                            <div style="font-size: 16px; margin-top: 5px;">${firstPlaceWinner}</div>
-                        </div>
-                        <div style="text-align: center; background: rgba(${isRandomPrize ? '156, 39, 176' : '192, 192, 192'}, 0.2); border-radius: 10px; padding: 15px; flex: 1; min-width: 200px;">
-                            <div style="font-size: 24px; margin-bottom: 5px;">${secondPrizeIcon}</div>
-                            <div style="font-weight: bold; font-size: 18px; color: ${secondPrizeColor};">${secondPrizeTitle}</div>
-                            <div style="font-size: 16px; margin-top: 5px;">${secondPlaceWinner}</div>
-                        </div>
+                    <div style="text-align: center; background: rgba(255, 215, 0, 0.2); border-radius: 10px; padding: 25px; margin: 10px;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">🏆</div>
+                        <div style="font-weight: bold; font-size: 20px; color: #FFD700; letter-spacing: 1px;">Winner</div>
+                        <div style="font-size: 28px; font-weight: bold; margin-top: 10px;">${firstPlaceWinner}</div>
                     </div>
                 `;
                 prizeWinnersDiv.style.display = 'block';
