@@ -361,6 +361,17 @@
         const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+
+        // FIX: loaner/shared devices often have clocks minutes out of sync. Timestamps were
+        // written with Date.now() on one device and compared against Date.now() from another,
+        // so a slow clock could mark a brand-new table as "stale from before the reset" and
+        // bounce the team back to the setup screen forever. Use server time everywhere.
+        let serverTimeOffset = 0;
+        database.ref('.info/serverTimeOffset').on('value', (snap) => {
+            serverTimeOffset = snap.val() || 0;
+        });
+        function serverNow() { return Date.now() + serverTimeOffset; }
+
         // Game state
         let gameState = {
             teamName: '',
@@ -381,38 +392,64 @@
             currentRound: 1, 
             showResults: false,
             resetTimestamp: 0,
+            roundStartTimestamp: 0,
             initialBudget: DEFAULT_INITIAL_BUDGET
         };
 
- function initializeAdminListener() {
-    adminRef = database.ref('admin');
-    adminRef.on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            const previousResetTimestamp = adminState.resetTimestamp || 0;
-            adminState = data;
+        // --- FIX: guards added in this revision ---
+        let hasReceivedFirstAdminSnapshot = false; // stop the first snapshot reading as a reset
+        let lastRoundStartTimestamp = 0;           // "new round" is NOT "re-pair everyone"
+        let sharedDeviceChoiceTouched = false;     // don't stomp the user's checkbox
+        let isSubmitting = false;                  // block double submits
 
-            if (!adminState.initialBudget) {
-                adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
-            }
-
-            updateRoundDisplay();
-
-            if (
-                adminState.resetTimestamp &&
-                adminState.resetTimestamp > previousResetTimestamp
-            ) {
-                if (adminState.forceTableReset) {
-                    handleAdminReset(); // Full reset only when needed
-                } else {
-                    handleAdminStateChange(); // Normal round update
+        // Initialize admin listener
+        function initializeAdminListener() {
+            adminRef = database.ref('admin');
+            adminRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const previousResetTimestamp = adminState.resetTimestamp || 0;
+                    const previousRoundStart = lastRoundStartTimestamp;
+                    adminState = data;
+                    
+                    // Ensure we have an initial budget set
+                    if (!adminState.initialBudget) {
+                        adminState.initialBudget = DEFAULT_INITIAL_BUDGET;
+                    }
+                    
+                    lastRoundStartTimestamp = adminState.roundStartTimestamp || 0;
+                    updateRoundDisplay();
+                    
+                    // FIX: the FIRST snapshot is just the server's current state, not an event.
+                    // Previously it always looked like a reset (local default 0 < stored timestamp),
+                    // which bounced anyone who joined before this callback landed.
+                    if (!hasReceivedFirstAdminSnapshot) {
+                        hasReceivedFirstAdminSnapshot = true;
+                        gameState.lastResetTimestamp = adminState.resetTimestamp || 0;
+                        handleAdminStateChange();
+                        return;
+                    }
+                    
+                    // Admin forced a full re-pairing
+                    if (adminState.resetTimestamp && adminState.resetTimestamp > previousResetTimestamp) {
+                        handleAdminReset();
+                        return;
+                    }
+                    
+                    // FIX: admin started the next round - stay seated, just clear the round.
+                    if (lastRoundStartTimestamp > previousRoundStart) {
+                        if (currentTableRef) {
+                            resetForNewRound();
+                            showMessage('Round ' + (adminState.currentRound || 1) + ' has started.');
+                        }
+                        handleAdminStateChange();
+                        return;
+                    }
+                    
+                    handleAdminStateChange();
                 }
-            } else {
-                handleAdminStateChange();
-            }
+            });
         }
-    });
-}
 
         function getInitialBudget() {
             return adminState.initialBudget || DEFAULT_INITIAL_BUDGET;
@@ -422,7 +459,11 @@
             const negotiatedSelect = document.getElementById('negotiated-contribution');
             const actualSelect = document.getElementById('actual-contribution');
             
+            const maxOption = Math.floor(budget / 100) * 100;
             [negotiatedSelect, actualSelect].forEach(select => {
+                // FIX: don't rebuild if nothing changed - rebuilding on every snapshot
+                // closed the dropdown while a team was choosing.
+                if (select.options.length === (maxOption / 100) + 1) return;
                 const currentValue = select.value;
                 select.innerHTML = '';
                 for (let i = 0; i <= Math.floor(budget / 100) * 100; i += 100) {
@@ -506,75 +547,50 @@
             }
         }
 
-    function handleAdminStateChange() {
-        // Handle force table reset
-        if (adminState.forceTableReset) {
-            handleForceTableReset();
-            return;
-        }
+        function handleAdminStateChange() {
+            // Handle force table reset
+            if (adminState.forceTableReset) {
+                handleForceTableReset();
+                return;
+            }
 
-        // Show/hide shared device option based on admin setting
-        const sharedDeviceOption = document.getElementById('shared-device-option');
-        const sharedDeviceCheckbox = document.getElementById('is-shared-device');
-        
-        if (adminState.sharedDevices) {
-            sharedDeviceOption.style.display = 'block';
-            sharedDeviceCheckbox.checked = true;
-        } else {
-            sharedDeviceOption.style.display = 'none';
-            sharedDeviceCheckbox.checked = false;
-        }
-
-        // Handle centrally controlled mode
-        if (adminState.controlMode === 'controlled') {
-            handleControlledMode();
+            // Show/hide shared device option based on admin setting
+            const sharedDeviceOption = document.getElementById('shared-device-option');
+            const sharedDeviceCheckbox = document.getElementById('is-shared-device');
             
-            // Check if admin just enabled results display and we have complete round data
-            if (adminState.showResults && !showingResults) {
-                if (currentTableRef) {
-                    currentTableRef.once('value').then((snapshot) => {
-                        const tableData = snapshot.val();
-                        if (tableData && tableData.roundData && 
-                            tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
-                            // CHANGE: Check if results were already processed for this round
-                            if (tableData.resultsProcessed !== adminState.currentRound) {
+            // FIX: only set the default once. Previously every admin write re-checked the
+            // box, silently overriding a team that had deliberately unchecked it.
+            if (adminState.sharedDevices) {
+                sharedDeviceOption.style.display = 'block';
+                if (!sharedDeviceChoiceTouched && !sharedDeviceCheckbox.disabled) {
+                    sharedDeviceCheckbox.checked = true;
+                }
+            } else {
+                sharedDeviceOption.style.display = 'none';
+                if (!sharedDeviceChoiceTouched) sharedDeviceCheckbox.checked = false;
+            }
+
+            // Handle centrally controlled mode
+            if (adminState.controlMode === 'controlled') {
+                handleControlledMode();
+                
+                // Check if admin just enabled results display and we have complete round data
+                if (adminState.showResults && !showingResults) {
+                    if (currentTableRef) {
+                        currentTableRef.once('value').then((snapshot) => {
+                            const tableData = snapshot.val();
+                            if (tableData && tableData.roundData && 
+                                tableData.roundData.teamA && tableData.roundData.teamB && !isCalculating) {
                                 isCalculating = true;
                                 calculateResults(tableData);
-                            } else {
-                                // Results already processed for this round, just show them
-                                showingResults = true;
-                                displayPreviousResults(tableData);
                             }
-                        }
-                    }).catch((error) => {
-                        console.error('Error checking table data:', error);
-                    });
+                        }).catch((error) => {
+                            console.error('Error checking table data:', error);
+                        });
+                    }
                 }
             }
         }
-    }
-
-    function displayPreviousResults(tableData) {
-    // Reconstruct the results display without recalculating
-    const dataA = tableData.roundData.teamA;
-    const dataB = tableData.roundData.teamB;
-    
-    if (!dataA || !dataB) return;
-    
-    // Calculate what the public good return was (for display only)
-    const totalContribution = dataA.actual + dataB.actual;
-    const publicGoodReturn = totalContribution * 0.75;
-    
-    // Update local budget from the stored value
-    gameState.budget = gameState.isTeamA ? tableData.teamA.budget : tableData.teamB.budget;
-    
-    // Update budget display
-    document.getElementById('my-budget').textContent = gameState.budget;
-    
-    // Show the results without recalculating
-    showResults(dataA, dataB, publicGoodReturn, tableData);
-    }
-
 
         function handleForceTableReset() {
             resetToInitialState();
@@ -596,6 +612,10 @@
                 if (nextRoundBtn) {
                     nextRoundBtn.style.display = 'none';
                 }
+            } else if (nextRoundBtn) {
+                // FIX: this was never restored, so once a tab had seen one controlled round
+                // its Next Round button stayed gone - even after switching back to free play.
+                nextRoundBtn.style.display = '';
             }
         }
 
@@ -638,95 +658,107 @@
 
         async function proceedWithTableJoin(teamName, tableCode, isSharedDevice) {
             try {
-                currentTableRef = database.ref(`tables/${tableCode}`);
-                
-                const tableSnapshot = await currentTableRef.once('value');
-                let tableData = tableSnapshot.val() || {
-                    teamA: null,
-                    teamB: null,
-                    roundData: {},
-                    status: 'waiting'
-                };
-                
-                // IMPORTANT: Check if this table has stale data from before the last reset
-                if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
-                    // This table has stale data from before the reset - clear it completely
-                    console.log('Clearing stale table data from before reset');
-                    tableData = {
-                        teamA: null,
-                        teamB: null,
-                        roundData: {},
-                        status: 'waiting',
-                        createdAfterReset: Date.now() // Mark when this fresh table was created
-                    };
-                }
-                
-                // Set shared device flag if this is the first team to join
-                if (!tableData.teamA && !tableData.teamB) {
-                    tableData.isSharedDevice = isSharedDevice;
-                    tableData.createdAfterReset = Date.now(); // Mark as fresh
-                    // Initialize turn tracking for shared devices
-                    if (isSharedDevice) {
-                        tableData.currentTurn = 1;
-                        tableData.roundOrder = [1, 2];
-                    }
-                }
-                
-                // Get team's existing budget
+                const tableRef = database.ref(`tables/${tableCode}`);
+
+                // Resolve this team's budget BEFORE touching the table.
                 const teamRef = database.ref(`teams/${teamName}`);
                 const teamSnapshot = await teamRef.once('value');
                 const teamData = teamSnapshot.val();
-                
-                if (teamData) {
+
+                if (teamData && typeof teamData.budget === 'number') {
                     gameState.budget = teamData.budget;
                 } else {
-                    // New team - use admin-configured initial budget
                     const initialBudget = getInitialBudget();
-                    await teamRef.set({ budget: initialBudget, totalRounds: 0 });
+                    await teamRef.update({
+                        budget: initialBudget,
+                        totalRounds: (teamData && teamData.totalRounds) || 0
+                    });
                     gameState.budget = initialBudget;
                 }
-                
-                // Join table logic
-                if (!tableData.teamA) {
-                    tableData.teamA = { name: teamName, budget: gameState.budget };
-                    gameState.isTeamA = true;
-                } else if (!tableData.teamB && tableData.teamA.name !== teamName) {
-                    tableData.teamB = { name: teamName, budget: gameState.budget };
-                    gameState.isTeamA = false;
-                } else if (tableData.teamA.name === teamName) {
-                    tableData.teamA.budget = gameState.budget;
-                    gameState.isTeamA = true;
-                } else if (tableData.teamB && tableData.teamB.name === teamName) {
-                    tableData.teamB.budget = gameState.budget;
-                    gameState.isTeamA = false;
-                } else {
-                    showError('Table is full with different teams');
+
+                const myBudget = gameState.budget;
+                const resetTs = adminState.resetTimestamp || 0;
+
+                // FIX: claim a seat ATOMICALLY. The old code did once('value') then set(),
+                // so two teams typing the same code at the same moment both read an empty
+                // table, both wrote themselves into teamA, and neither was ever paired.
+                const result = await tableRef.transaction((table) => {
+                    const stale = !table
+                        || !table.createdAfterReset
+                        || (resetTs && table.createdAfterReset < resetTs)
+                        || table.changeTable;   // self-heals an abandoned "change table" flag
+
+                    if (stale) {
+                        table = {
+                            teamA: null,
+                            teamB: null,
+                            roundData: null,
+                            negotiations: null,
+                            results: null,
+                            resultsProcessed: null,
+                            changeTable: null,
+                            status: 'waiting',
+                            isSharedDevice: !!isSharedDevice,
+                            createdAfterReset: serverNow()
+                        };
+                        if (isSharedDevice) {
+                            table.currentTurn = 1;
+                            table.roundOrder = [1, 2];
+                        }
+                    }
+
+                    // Rejoin is idempotent - a refresh or a re-typed code returns your own seat.
+                    if (table.teamA && table.teamA.name === teamName) {
+                        table.teamA.budget = myBudget;
+                        return table;
+                    }
+                    if (table.teamB && table.teamB.name === teamName) {
+                        table.teamB.budget = myBudget;
+                        return table;
+                    }
+                    if (!table.teamA) {
+                        table.teamA = { name: teamName, budget: myBudget };
+                        if (!table.teamB) table.isSharedDevice = !!isSharedDevice;
+                        return table;
+                    }
+                    if (!table.teamB) {
+                        table.teamB = { name: teamName, budget: myBudget };
+                        table.status = 'ready';
+                        return table;
+                    }
+                    return; // abort - genuinely full
+                });
+
+                if (!result.committed) {
+                    showError('Table ' + tableCode + ' already has two other teams. Please check your table code.');
                     return;
                 }
-                
-                // Update current table reference in team record
+
+                const finalTable = result.snapshot.val();
+                gameState.isTeamA = !!(finalTable.teamA && finalTable.teamA.name === teamName);
+
+                // FIX: only now do we count as "in a game". Setting this earlier made
+                // failed joins trigger round banners and spurious reset messages.
+                currentTableRef = tableRef;
+
                 await database.ref(`teams/${teamName}/currentTable`).set(tableCode);
-                
-                // Update table in Firebase
-                await currentTableRef.set(tableData);
-                
-                // Set up real-time listener
+
                 currentTableRef.on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
                         updateGameState(data);
                     }
                 });
-                
-                // Switch to game phase
+
                 document.getElementById('setup-phase').classList.add('hidden');
                 document.getElementById('game-phase').classList.remove('hidden');
-                
-                // Initialize contribution options based on current budget
+
                 updateContributionOptions(gameState.budget);
-                
+                updateRoundDisplay();
+
             } catch (error) {
                 console.error('Error joining table:', error);
+                currentTableRef = null;
                 showError('Error joining table. Please try again.');
             }
         }
@@ -739,35 +771,10 @@
             }
             
             // Check if this table has been reset and needs fresh start
-            if (
-            adminState.forceTableReset &&
-            adminState.resetTimestamp &&
-            (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)
-            ) {
-            console.log('Forced table reset triggered');
-            handleForceTableReset();
-            return;
-            }
-
-            // Clear round results and reset UI if a new round has started
-            if (gameState.lastRoundDisplayed !== adminState.currentRound) {
-                gameState.lastRoundDisplayed = adminState.currentRound;
-
-                isCalculating = false;
-                showingResults = false;
-
-                document.getElementById('round-results').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                document.getElementById('admin-waiting').classList.add('hidden');
-                document.getElementById('waiting-for-turn').classList.add('hidden');
-
-                document.getElementById('contribution-phase').classList.add('hidden');
-                document.getElementById('negotiation-phase').classList.remove('hidden');
-
-                document.getElementById('my-negotiated').textContent = '--';
-                document.getElementById('opponent-negotiated').textContent = '--';
-                document.getElementById('negotiated-contribution').value = '0';
-                document.getElementById('actual-contribution').value = '0';
+            if (adminState.resetTimestamp && (!tableData.createdAfterReset || tableData.createdAfterReset < adminState.resetTimestamp)) {
+                console.log('Table data is stale, forcing reset');
+                handleForceTableReset();
+                return;
             }
             
             // Show opponent registration button if this is a shared device table
@@ -829,6 +836,10 @@
         function resetForNewRound() {
             isCalculating = false;
             showingResults = false;
+            isSubmitting = false;
+            const submitBtn = document.getElementById('submit-button');
+            if (submitBtn) submitBtn.disabled = false;
+            document.getElementById('results-content').innerHTML = '';
             
             document.getElementById('round-results').classList.add('hidden');
             document.getElementById('game-controls').classList.remove('hidden');
@@ -848,134 +859,106 @@
             document.getElementById('actual-contribution').value = '0';
         }
 
-    function handleSharedDeviceTurns(tableData) {
-        const myTeamNumber = gameState.isTeamA ? 1 : 2;
-        const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-        const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
-        
-        // Check if it's my turn
-        const isMyTurn = tableData.currentTurn === myTeamNumber;
-        
-        // Check submission status
-        const iHaveSubmitted = tableData.roundData && tableData.roundData[myTeamKey];
-        const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
-        
-        if (iHaveSubmitted && opponentHasSubmitted && !isCalculating) {
-            // Both teams have submitted - show results or wait for admin
-            document.getElementById('waiting-for-turn').classList.add('hidden');
-            document.getElementById('waiting-for-round').classList.add('hidden');
+        function handleSharedDeviceTurns(tableData) {
+            const myTeamNumber = gameState.isTeamA ? 1 : 2;
+            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
             
-            if (adminState.controlMode === 'controlled') {
-                if (adminState.showResults) {
-                    document.getElementById('admin-waiting').classList.add('hidden');
-                    
-                    // NEW: Check if results were already processed for this round
-                    if (tableData.resultsProcessed !== adminState.currentRound) {
-                        isCalculating = true;
-                        calculateResults(tableData);
-                    } else if (!showingResults) {
-                        // Results already processed for this round, just display them
-                        showingResults = true;
-                        displayPreviousResults(tableData);
-                    }
-                } else {
-                    document.getElementById('game-controls').classList.add('hidden');
-                    document.getElementById('admin-waiting').classList.remove('hidden');
-                    document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
-                }
-            } else {
-                document.getElementById('admin-waiting').classList.add('hidden');
-                
-                // NEW: Check if results were already processed for this round
-                if (tableData.resultsProcessed !== adminState.currentRound) {
-                    isCalculating = true;
-                    calculateResults(tableData);
-                } else if (!showingResults) {
-                    // Results already processed for this round, just display them
-                    showingResults = true;
-                    displayPreviousResults(tableData);
-                }
-            }
-        } else if (iHaveSubmitted) {
-            // I've submitted, waiting for opponent
-            document.getElementById('game-controls').classList.add('hidden');
-            document.getElementById('waiting-for-turn').classList.remove('hidden');
-            document.getElementById('waiting-for-round').classList.add('hidden');
-            document.getElementById('admin-waiting').classList.add('hidden');
-        } else if (isMyTurn) {
-            // It's my turn to play
-            document.getElementById('game-controls').classList.remove('hidden');
-            document.getElementById('waiting-for-turn').classList.add('hidden');
-            document.getElementById('waiting-for-round').classList.add('hidden');
-            document.getElementById('admin-waiting').classList.add('hidden');
-        } else {
-            // It's not my turn, waiting for opponent to play
-            document.getElementById('game-controls').classList.add('hidden');
-            document.getElementById('waiting-for-turn').classList.remove('hidden');
-            document.getElementById('waiting-for-round').classList.add('hidden');
-            document.getElementById('admin-waiting').classList.add('hidden');
-        }
-    }
-
-    function handleSimultaneousPlay(tableData) {
-        // Original logic for non-shared devices (simultaneous play)
-        const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-        const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
-        
-        if (tableData.roundData && tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]) {
-            // I've submitted, waiting for opponent
-            document.getElementById('game-controls').classList.add('hidden');
-            document.getElementById('waiting-for-round').classList.remove('hidden');
-            document.getElementById('admin-waiting').classList.add('hidden');
-            document.getElementById('waiting-for-turn').classList.add('hidden');
-        } else if (tableData.roundData && tableData.roundData[myTeamKey] && tableData.roundData[opponentKey] && !isCalculating) {
-            // Both teams have submitted
-            document.getElementById('waiting-for-round').classList.add('hidden');
-            document.getElementById('waiting-for-turn').classList.add('hidden');
+            // Check if it's my turn
+            const isMyTurn = tableData.currentTurn === myTeamNumber;
             
-            if (adminState.controlMode === 'controlled') {
-                if (adminState.showResults) {
-                    document.getElementById('admin-waiting').classList.add('hidden');
-                    
-                    // NEW: Check if results were already processed for this round
-                    if (tableData.resultsProcessed !== adminState.currentRound) {
-                        isCalculating = true;
-                        calculateResults(tableData);
-                    } else if (!showingResults) {
-                        // Results already processed for this round, just display them
-                        showingResults = true;
-                        displayPreviousResults(tableData);
-                    }
-                } else {
-                    document.getElementById('game-controls').classList.add('hidden');
-                    document.getElementById('admin-waiting').classList.remove('hidden');
-                    document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
-                }
-            } else {
+            // Check submission status
+            const iHaveSubmitted = tableData.roundData && tableData.roundData[myTeamKey];
+            const opponentHasSubmitted = tableData.roundData && tableData.roundData[opponentKey];
+            
+            if (iHaveSubmitted && opponentHasSubmitted) {
+                handleBothSubmitted(tableData);
+            } else if (iHaveSubmitted) {
+                // I've submitted, waiting for opponent
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
                 document.getElementById('admin-waiting').classList.add('hidden');
-                
-                // NEW: Check if results were already processed for this round
-                if (tableData.resultsProcessed !== adminState.currentRound) {
-                    isCalculating = true;
-                    calculateResults(tableData);
-                } else if (!showingResults) {
-                    // Results already processed for this round, just display them
-                    showingResults = true;
-                    displayPreviousResults(tableData);
-                }
+            } else if (isMyTurn) {
+                // It's my turn to play
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+            } else {
+                // It's not my turn, waiting for opponent to play
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
             }
-        } else if (!showingResults && (!tableData.roundData || (!tableData.roundData[myTeamKey] && !tableData.roundData[opponentKey]))) {
-            // Ready to play
-            document.getElementById('game-controls').classList.remove('hidden');
-            document.getElementById('waiting-for-round').classList.add('hidden');
-            document.getElementById('round-results').classList.add('hidden');
-            document.getElementById('admin-waiting').classList.add('hidden');
-            document.getElementById('waiting-for-turn').classList.add('hidden');
         }
-    }   
 
-        function finalizeNegotiation() {
+        function handleSimultaneousPlay(tableData) {
+            const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
+            const opponentKey = gameState.isTeamA ? 'teamB' : 'teamA';
+            const mine = tableData.roundData && tableData.roundData[myTeamKey];
+            const theirs = tableData.roundData && tableData.roundData[opponentKey];
+
+            if (mine && theirs) {
+                handleBothSubmitted(tableData);
+            } else if (mine) {
+                // I've submitted, waiting for opponent
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('waiting-for-round').classList.remove('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+            } else if (!showingResults) {
+                // Ready to play (also covers "opponent submitted first", which the old
+                // version had no branch for)
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('waiting-for-round').classList.add('hidden');
+                document.getElementById('round-results').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.add('hidden');
+                document.getElementById('waiting-for-turn').classList.add('hidden');
+            }
+        }
+
+        // FIX: one shared path for "both teams are in". Results are now written ONCE to the
+        // table by a single elected client (or by the admin in controlled mode) and every
+        // client renders that same stored payload - so payoffs can't be applied twice.
+        function handleBothSubmitted(tableData) {
+            document.getElementById('waiting-for-round').classList.add('hidden');
+            document.getElementById('waiting-for-turn').classList.add('hidden');
+
+            if (adminState.controlMode === 'controlled' && !adminState.showResults) {
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('admin-waiting').classList.remove('hidden');
+                document.getElementById('admin-message').textContent = 'Waiting for instructor to show results';
+                return;
+            }
+
+            document.getElementById('admin-waiting').classList.add('hidden');
+
+            if (tableData.results) {
+                applyStoredResults(tableData);
+            } else if (!isCalculating) {
+                isCalculating = true;
+                calculateResults(tableData);
+            }
+        }
+
+        function applyStoredResults(tableData) {
+            const r = tableData.results;
+            if (!r) return;
+            gameState.budget = gameState.isTeamA ? r.budgetA : r.budgetB;
+            document.getElementById('my-budget').textContent = gameState.budget;
+            renderResults(r);
+            isCalculating = false;
+        }
+
+        async function finalizeNegotiation() {
             const negotiatedAmount = document.getElementById('negotiated-contribution').value;
+            
+            // FIX: push the value even if the team never touched the dropdown. onchange
+            // never fires on an untouched select, so a negotiated 0 was invisible to the
+            // opponent, who just saw "--".
+            await updateNegotiatedContribution();
             
             // Update the display and set default for actual contribution
             document.getElementById('negotiated-display').textContent = negotiatedAmount;
@@ -1006,6 +989,10 @@
         }
 
         async function submitRound() {
+            if (isSubmitting) return;   // FIX: block double taps
+            isSubmitting = true;
+            document.getElementById('submit-button').disabled = true;
+            
             const negotiatedContribution = parseInt(document.getElementById('negotiated-contribution').value);
             const actualContribution = parseInt(document.getElementById('actual-contribution').value);
             
@@ -1046,177 +1033,183 @@
             } catch (error) {
                 console.error('Error submitting round:', error);
                 showError('Error submitting. Please try again.');
+                document.getElementById('submit-button').disabled = false;
+            } finally {
+                isSubmitting = false;
             }
         }
 
-async function calculateResults(tableData) {
-    const dataA = tableData.roundData.teamA;
-    const dataB = tableData.roundData.teamB;
-    
-    if (!dataA || !dataB) return;
-    
-    // Calculate public good returns
-    const totalContribution = dataA.actual + dataB.actual;
-    const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 = 0.75 per player
-    
-    // Calculate new budgets
-    const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
-    const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
-    
-    try {
-        // Update budgets in Firebase
-        const updates = {};
-        updates[`tables/${gameState.tableCode}/teamA/budget`] = Math.round(newBudgetA);
-        updates[`tables/${gameState.tableCode}/teamB/budget`] = Math.round(newBudgetB);
-        // CHANGE: Store the round number instead of just true
-        updates[`tables/${gameState.tableCode}/resultsProcessed`] = adminState.currentRound;
-        
-        // Update team records
-        updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
-        updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
-        
-        // Get current round counts and increment
-        const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
-        const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
-        
-        // Round update
-        const currentRound = adminState.currentRound || 1;
-        const teamACurrentRounds = teamASnapshot.val() || 0;
-        const teamBCurrentRounds = teamBSnapshot.val() || 0;
+        async function calculateResults(tableData) {
+            const dataA = tableData.roundData && tableData.roundData.teamA;
+            const dataB = tableData.roundData && tableData.roundData.teamB;
 
-        // Only update if this is a new round for the team
-        if (teamACurrentRounds < currentRound) {
-            updates[`teams/${tableData.teamA.name}/totalRounds`] = currentRound;
-        }
-        if (teamBCurrentRounds < currentRound) {
-            updates[`teams/${tableData.teamB.name}/totalRounds`] = currentRound;
-        }
-        
-        await database.ref().update(updates);
-        
-        // Update local budget
-        gameState.budget = gameState.isTeamA ? Math.round(newBudgetA) : Math.round(newBudgetB);
-        
-        // Display results
-        showResults(dataA, dataB, publicGoodReturn, tableData);
-        
-        // Reset calculation flag
-        isCalculating = false;
-        
-    } catch (error) {
-        console.error('Error updating results:', error);
-        showError('Error calculating results. Please refresh.');
-        isCalculating = false;
-    }
-}
+            if (!dataA || !dataB) { isCalculating = false; return; }
 
-        function showResults(dataA, dataB, publicGoodReturn, tableData) {
-            const team1Name = tableData.teamA.name;
-            const team2Name = tableData.teamB.name;
-            const team1Budget = Math.round((tableData.teamA.budget - dataA.actual) + publicGoodReturn);
-            const team2Budget = Math.round((tableData.teamB.budget - dataB.actual) + publicGoodReturn);
-            const team1Leftover = tableData.teamA.budget - dataA.actual;
-            const team2Leftover = tableData.teamB.budget - dataB.actual;
-            
+            const tableRef = database.ref(`tables/${gameState.tableCode}`);
+            const roundKey = adminState.currentRound || 1;
+
+            try {
+                // FIX: elect exactly ONE writer per round. Previously BOTH clients ran this
+                // (and in controlled mode the admin ran its own copy too), so whoever went
+                // second could recompute from an already-updated budget and apply the
+                // payoff twice.
+                const claim = await tableRef.child('resultsProcessed').transaction((current) => {
+                    if (current !== null && current !== undefined) return; // abort
+                    return roundKey;
+                });
+
+                if (!claim.committed) {
+                    isCalculating = false;
+                    return; // the listener will deliver `results` and we'll render them
+                }
+
+                const totalContribution = dataA.actual + dataB.actual;
+                const publicGoodReturn = totalContribution * 0.75; // 1.5 * 0.5 per team
+                const budgetA = Math.round((tableData.teamA.budget - dataA.actual) + publicGoodReturn);
+                const budgetB = Math.round((tableData.teamB.budget - dataB.actual) + publicGoodReturn);
+
+                const results = {
+                    round: roundKey,
+                    teamAName: tableData.teamA.name,
+                    teamBName: tableData.teamB.name,
+                    negotiatedA: dataA.negotiated,
+                    negotiatedB: dataB.negotiated,
+                    actualA: dataA.actual,
+                    actualB: dataB.actual,
+                    publicGoodReturn: Math.round(publicGoodReturn),
+                    leftoverA: tableData.teamA.budget - dataA.actual,
+                    leftoverB: tableData.teamB.budget - dataB.actual,
+                    budgetA: budgetA,
+                    budgetB: budgetB
+                };
+
+                const teamASnapshot = await database.ref(`teams/${tableData.teamA.name}/totalRounds`).once('value');
+                const teamBSnapshot = await database.ref(`teams/${tableData.teamB.name}/totalRounds`).once('value');
+
+                const updates = {};
+                updates[`tables/${gameState.tableCode}/teamA/budget`] = budgetA;
+                updates[`tables/${gameState.tableCode}/teamB/budget`] = budgetB;
+                updates[`tables/${gameState.tableCode}/results`] = results;
+                updates[`teams/${tableData.teamA.name}/budget`] = budgetA;
+                updates[`teams/${tableData.teamB.name}/budget`] = budgetB;
+                updates[`teams/${tableData.teamA.name}/totalRounds`] = (teamASnapshot.val() || 0) + 1;
+                updates[`teams/${tableData.teamB.name}/totalRounds`] = (teamBSnapshot.val() || 0) + 1;
+
+                await database.ref().update(updates);
+
+                gameState.budget = gameState.isTeamA ? budgetA : budgetB;
+                document.getElementById('my-budget').textContent = gameState.budget;
+                renderResults(results);
+                isCalculating = false;
+
+            } catch (error) {
+                console.error('Error updating results:', error);
+                showError('Error calculating results. Please refresh.');
+                isCalculating = false;
+            }
+        }
+
+        function renderResults(r) {
+            const cell = 'padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);';
             const resultsHTML = `
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
                     <thead>
                         <tr>
                             <th style="text-align: left; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3);"></th>
-                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${team1Name}</th>
-                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${team2Name}</th>
+                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${r.teamAName}</th>
+                            <th style="text-align: center; padding: 10px; border-bottom: 2px solid rgba(255,255,255,0.3); color: #4CAF50; font-weight: bold;">${r.teamBName}</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Negotiated Contribution</td>
-                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataA.negotiated}</td>
-                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataB.negotiated}</td>
+                            <td style="${cell}">${r.negotiatedA}</td>
+                            <td style="${cell}">${r.negotiatedB}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Actual Contribution</td>
-                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataA.actual}</td>
-                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${dataB.actual}</td>
+                            <td style="${cell}">${r.actualA}</td>
+                            <td style="${cell}">${r.actualB}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Public Good Return (each)</td>
-                            <td colspan="2" style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${Math.round(publicGoodReturn)}</td>
+                            <td colspan="2" style="${cell}">${r.publicGoodReturn}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">Leftover Budget</td>
-                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${team1Leftover}</td>
-                            <td style="padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${team2Leftover}</td>
+                            <td style="${cell}">${r.leftoverA}</td>
+                            <td style="${cell}">${r.leftoverB}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; font-weight: bold;">New Budget</td>
-                            <td style="padding: 8px; text-align: center; font-weight: bold;">${team1Budget}</td>
-                            <td style="padding: 8px; text-align: center; font-weight: bold;">${team2Budget}</td>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${r.budgetA}</td>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${r.budgetB}</td>
                         </tr>
                     </tbody>
                 </table>
             `;
-            
+
             document.getElementById('results-content').innerHTML = resultsHTML;
             document.getElementById('waiting-for-round').classList.add('hidden');
             document.getElementById('waiting-for-turn').classList.add('hidden');
             document.getElementById('game-controls').classList.add('hidden');
             document.getElementById('admin-waiting').classList.add('hidden');
             document.getElementById('round-results').classList.remove('hidden');
-            
-            // Set flag to prevent game controls from reappearing
+
             showingResults = true;
-            
-            // Handle admin control for next round
+
             if (adminState.controlMode === 'controlled') {
                 handleControlledMode();
             }
         }
 
-    async function nextRound() {
-        try {
+        async function nextRound() {
             const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
-            const tableSnapshot = await tableRef.once('value');
-            const tableData = tableSnapshot.val();
-            
-            // Clear round data for this table but keep teams
-            await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).set({});
-            await database.ref(`tables/${gameState.tableCode.toUpperCase()}/negotiations`).set({});
-            // CHANGE: Remove resultsProcessed entirely instead of setting to null
-            await database.ref(`tables/${gameState.tableCode.toUpperCase()}/resultsProcessed`).remove();
-            
-            // For shared devices, alternate the round order and reset turn
-            if (tableData && tableData.isSharedDevice) {
-                const currentOrder = tableData.roundOrder || [1, 2];
-                const newOrder = [currentOrder[1], currentOrder[0]]; // Reverse the order
-                
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundOrder`).set(newOrder);
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/currentTurn`).set(newOrder[0]);
+
+            try {
+                // FIX: advance the round ATOMICALLY and only once. The old version blindly
+                // wiped roundData, so if the other team had already submitted for the new
+                // round their answer was destroyed - and on a shared device two presses
+                // reversed the turn order twice, i.e. not at all.
+                await tableRef.transaction((table) => {
+                    if (!table) return table;
+                    if (table.resultsProcessed === null || table.resultsProcessed === undefined) {
+                        return; // abort - someone already advanced this table
+                    }
+                    table.roundData = null;
+                    table.negotiations = null;
+                    table.results = null;
+                    table.resultsProcessed = null;
+                    if (table.isSharedDevice) {
+                        const order = table.roundOrder || [1, 2];
+                        table.roundOrder = [order[1], order[0]];
+                        table.currentTurn = order[1];
+                    }
+                    return table;
+                });
+
+                resetForNewRound();
+
+            } catch (error) {
+                console.error('Error starting new round:', error);
+                showError('Error preparing new round. Please refresh if needed.');
             }
-            
-            // Reset for new round
-            resetForNewRound();
-            
-        } catch (error) {
-            console.error('Error starting new round:', error);
-            showError('Error preparing new round. Please refresh if needed.');
         }
-    }
 
         async function changeTable() {
+            const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
+
             try {
-                // Signal both teams to change tables by setting a flag
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/changeTable`).set(true);
-                
-                // Remove both teams from current table
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/teamA`).remove();
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/teamB`).remove();
-                
-                // Clear round data
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/roundData`).remove();
-                
-                // Reset UI for table selection
+                // Signal the partner, then clear the node completely.
+                // FIX: the old version left changeTable=true behind forever, which poisoned
+                // that table code - every later team that typed it was bounced straight back
+                // to the setup screen.
+                await tableRef.update({ changeTable: serverNow() });
                 handleForceTableReset();
-                
+                setTimeout(() => {
+                    tableRef.remove().catch((e) => console.error('Table cleanup failed:', e));
+                }, 2000);
+
             } catch (error) {
                 console.error('Error changing table:', error);
                 showError('Error changing table. Please refresh if needed.');
@@ -1250,9 +1243,17 @@ async function calculateResults(tableData) {
 
         async function cancelWaiting() {
             try {
-                // Remove this team from current table
-                const myTeamKey = gameState.isTeamA ? 'teamA' : 'teamB';
-                await database.ref(`tables/${gameState.tableCode.toUpperCase()}/${myTeamKey}`).remove();
+                // FIX: remove by NAME, not by remembered slot - if the seat changed we used
+                // to delete the wrong team.
+                const tableRef = database.ref(`tables/${gameState.tableCode.toUpperCase()}`);
+                await tableRef.transaction((table) => {
+                    if (!table) return table;
+                    if (table.teamA && table.teamA.name === gameState.teamName) table.teamA = null;
+                    if (table.teamB && table.teamB.name === gameState.teamName) table.teamB = null;
+                    if (!table.teamA && !table.teamB) return null; // drop the empty table
+                    table.status = 'waiting';
+                    return table;
+                });
                 
                 // Stop listening to current table
                 if (currentTableRef) {
@@ -1274,6 +1275,13 @@ async function calculateResults(tableData) {
         window.addEventListener('load', () => {
             initializeAdminListener();
             checkURLParameters();
+            const sharedBox = document.getElementById('is-shared-device');
+            if (sharedBox) {
+                sharedBox.addEventListener('change', () => { sharedDeviceChoiceTouched = true; });
+            }
+            document.getElementById('table-code').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') joinTable();
+            });
         });
 
         function checkURLParameters() {

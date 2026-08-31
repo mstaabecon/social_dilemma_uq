@@ -546,6 +546,9 @@
                     <button class="button button-secondary" onclick="exportData()">
                         Export Game Data
                     </button>
+                    <button class="button button-danger" onclick="startNewSession()">
+                        Start New Session (wipe all)
+                    </button>
                 </div>
                 
                 <!-- Active Tables -->
@@ -592,6 +595,17 @@
         const database = firebase.database();
         const auth = firebase.auth();
 
+
+        // FIX: loaner/shared devices often have clocks minutes out of sync. Timestamps were
+        // written with Date.now() on one device and compared against Date.now() from another,
+        // so a slow clock could mark a brand-new table as "stale from before the reset" and
+        // bounce the team back to the setup screen forever. Use server time everywhere.
+        let serverTimeOffset = 0;
+        database.ref('.info/serverTimeOffset').on('value', (snap) => {
+            serverTimeOffset = snap.val() || 0;
+        });
+        function serverNow() { return Date.now() + serverTimeOffset; }
+
         // Current user
         let currentUser = null;
 
@@ -605,7 +619,8 @@
             forceTableReset: false,
             sharedDevices: false,
             leaderboardEnabled: false,
-            resetTimestamp: Date.now(),
+            resetTimestamp: 0,
+            roundStartTimestamp: 0,
             initialBudget: INITIAL_BUDGET
         };
 
@@ -820,6 +835,8 @@
                         <div class="table-status status-${status.type}">
                             <span class="status-icon">${status.icon}</span>
                             ${status.text}
+                            <button class="button button-danger" style="min-width: 0; padding: 6px 12px; font-size: 12px; margin-left: 10px;"
+                                    onclick="clearTable('${tableCode}')">Clear</button>
                         </div>
                     </div>
                 `;
@@ -913,6 +930,43 @@
         }
 
         // Admin Functions
+        // FIX: a team that closes its tab leaves a ghost sitting in a seat forever, and
+        // its partner can then never join. This gives you a per-table eviction.
+        async function clearTable(tableCode) {
+            return secureAdminOperation(async () => {
+                if (!confirm(`Clear table ${tableCode}? Both teams will need to re-join a table.`)) return;
+                await database.ref(`tables/${tableCode}`).remove();
+            });
+        }
+
+        // FIX: wipe everything between school groups. resetAllTables() keeps budgets,
+        // registrations and the finalised prize winners, so the next group inherited them.
+        async function startNewSession() {
+            return secureAdminOperation(async () => {
+                if (!confirm('Start a NEW SESSION?\n\nThis deletes all teams, registrations, tables and prize winners. Export your data first if you need it.')) return;
+                if (!confirm('Are you sure? This cannot be undone.')) return;
+                
+                await database.ref('tables').remove();
+                await database.ref('teams').remove();
+                await database.ref('registeredTeams').remove();
+                await database.ref('admin').update({
+                    currentRound: 1,
+                    showResults: false,
+                    processingResults: false,
+                    forceTableReset: false,
+                    gameFinalized: null,
+                    firstPlaceWinner: null,
+                    secondPlaceWinner: null,
+                    isRandomPrize: null,
+                    finalizationTimestamp: null,
+                    resetTimestamp: serverNow(),
+                    roundStartTimestamp: serverNow()
+                });
+                
+                alert('New session ready. Teams can register again.');
+            });
+        }
+
         async function changeControlMode() {
             return secureAdminOperation(async () => {
                 const selectedMode = document.querySelector('input[name="mode"]:checked').value;
@@ -952,38 +1006,75 @@
                     const updates = {};
                     let processedCount = 0;
                     
+                    const currentAdminRound = adminState.currentRound || 1;
+                    const defaultBudget = adminState.initialBudget || INITIAL_BUDGET;
+                    
                     for (let tableCode in tables) {
                         const tableData = tables[tableCode];
                         
-                        if (tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB) {
-                            const dataA = tableData.roundData.teamA;
-                            const dataB = tableData.roundData.teamB;
-                            const totalContribution = dataA.actual + dataB.actual;
-                            const publicGoodReturn = (totalContribution * 1.5) / 2;
-                            
-                            const newBudgetA = (tableData.teamA.budget - dataA.actual) + publicGoodReturn;
-                            const newBudgetB = (tableData.teamB.budget - dataB.actual) + publicGoodReturn;
-                            
-                            updates[`tables/${tableCode}/teamA/budget`] = Math.round(newBudgetA);
-                            updates[`tables/${tableCode}/teamB/budget`] = Math.round(newBudgetB);
-                            updates[`tables/${tableCode}/resultsProcessed`] = adminState.currentRound || 1;
-                            
-                            updates[`teams/${tableData.teamA.name}/budget`] = Math.round(newBudgetA);
-                            updates[`teams/${tableData.teamB.name}/budget`] = Math.round(newBudgetB);
-                            
-                            const teamACurrentRounds = teams[tableData.teamA.name]?.totalRounds || 0;
-                            const teamBCurrentRounds = teams[tableData.teamB.name]?.totalRounds || 0;
-                            const currentAdminRound = adminState.currentRound || 1;
-                            
-                            if (teamACurrentRounds < currentAdminRound) {
-                                updates[`teams/${tableData.teamA.name}/totalRounds`] = currentAdminRound;
-                            }
-                            if (teamBCurrentRounds < currentAdminRound) {
-                                updates[`teams/${tableData.teamB.name}/totalRounds`] = currentAdminRound;
-                            }
-                            
+                        if (!(tableData.roundData && tableData.roundData.teamA && tableData.roundData.teamB)) continue;
+                        
+                        // FIX: idempotency. resultsProcessed was written but never read, so
+                        // Show -> Hide -> Show applied the payoff twice and charged teams
+                        // for their contribution again.
+                        if (tableData.resultsProcessed !== null && tableData.resultsProcessed !== undefined) {
                             processedCount++;
+                            continue;
                         }
+                        
+                        const dataA = tableData.roundData.teamA;
+                        const dataB = tableData.roundData.teamB;
+                        const nameA = tableData.teamA.name;
+                        const nameB = tableData.teamB.name;
+                        
+                        // Read budgets from the team records (the source of truth for the
+                        // leaderboard), falling back to the table's copy.
+                        const startA = (teams[nameA] && typeof teams[nameA].budget === 'number')
+                            ? teams[nameA].budget : (tableData.teamA.budget || defaultBudget);
+                        const startB = (teams[nameB] && typeof teams[nameB].budget === 'number')
+                            ? teams[nameB].budget : (tableData.teamB.budget || defaultBudget);
+                        
+                        const totalContribution = dataA.actual + dataB.actual;
+                        const publicGoodReturn = (totalContribution * 1.5) / 2;
+                        
+                        const newBudgetA = Math.round((startA - dataA.actual) + publicGoodReturn);
+                        const newBudgetB = Math.round((startB - dataB.actual) + publicGoodReturn);
+                        
+                        updates[`tables/${tableCode}/teamA/budget`] = newBudgetA;
+                        updates[`tables/${tableCode}/teamB/budget`] = newBudgetB;
+                        updates[`tables/${tableCode}/resultsProcessed`] = currentAdminRound;
+                        
+                        // Same payload shape the game page renders, so both teams see
+                        // identical numbers and no client recomputes anything.
+                        updates[`tables/${tableCode}/results`] = {
+                            round: currentAdminRound,
+                            teamAName: nameA,
+                            teamBName: nameB,
+                            negotiatedA: dataA.negotiated,
+                            negotiatedB: dataB.negotiated,
+                            actualA: dataA.actual,
+                            actualB: dataB.actual,
+                            publicGoodReturn: Math.round(publicGoodReturn),
+                            leftoverA: startA - dataA.actual,
+                            leftoverB: startB - dataB.actual,
+                            budgetA: newBudgetA,
+                            budgetB: newBudgetB
+                        };
+                        
+                        updates[`teams/${nameA}/budget`] = newBudgetA;
+                        updates[`teams/${nameB}/budget`] = newBudgetB;
+                        
+                        const teamACurrentRounds = teams[nameA]?.totalRounds || 0;
+                        const teamBCurrentRounds = teams[nameB]?.totalRounds || 0;
+                        
+                        if (teamACurrentRounds < currentAdminRound) {
+                            updates[`teams/${nameA}/totalRounds`] = currentAdminRound;
+                        }
+                        if (teamBCurrentRounds < currentAdminRound) {
+                            updates[`teams/${nameB}/totalRounds`] = currentAdminRound;
+                        }
+                        
+                        processedCount++;
                     }
                     
                     updates['admin/showResults'] = true;
@@ -1010,6 +1101,8 @@
                     updates[`tables/${tableCode}/roundData`] = null;
                     updates[`tables/${tableCode}/negotiations`] = null;
                     updates[`tables/${tableCode}/resultsProcessed`] = null;
+                    updates[`tables/${tableCode}/results`] = null;
+                    updates[`tables/${tableCode}/changeTable`] = null;
                     
                     if (tables[tableCode].isSharedDevice) {
                         const randomOrder = Math.random() < 0.5 ? [1, 2] : [2, 1];
@@ -1021,11 +1114,17 @@
                 updates['admin/currentRound'] = (adminState.currentRound || 1) + 1;
                 updates['admin/showResults'] = false;
                 updates['admin/allowNewRounds'] = true;
-                updates['admin/resetTimestamp'] = Date.now();
+                // FIX: do NOT bump resetTimestamp here. That invalidated every table's
+                // createdAfterReset stamp, so both teams were bounced to the setup screen
+                // and then raced to re-create the same table - the main cause of teams
+                // ending up unpaired and re-typing their table code every round.
+                // resetTimestamp now means "re-pair everyone" and is only set by
+                // resetAllTables(). roundStartTimestamp means "next round, same partner".
+                updates['admin/roundStartTimestamp'] = serverNow();
                 
                 await database.ref().update(updates);
                 
-                alert(`New round started! All teams can now negotiate and play.`);
+                alert(`Round ${(adminState.currentRound || 1) + 1} started. Teams stay with their current partner.`);
             });
         }
 
@@ -1035,10 +1134,13 @@
                     return;
                 }
                 
-                const resetTimestamp = Date.now();
+                const resetTimestamp = serverNow();
                 
-                await database.ref('admin/forceTableReset').set(true);
-                await database.ref('admin/resetTimestamp').set(resetTimestamp);
+                // FIX: write both in ONE update so clients see a single coherent event.
+                await database.ref('admin').update({
+                    forceTableReset: true,
+                    resetTimestamp: resetTimestamp
+                });
                 
                 await database.ref('tables').set({});
                 
@@ -1124,7 +1226,7 @@
                 updates['admin/firstPlaceWinner'] = firstPlaceWinner;
                 updates['admin/secondPlaceWinner'] = secondPlaceWinner;
                 updates['admin/isRandomPrize'] = isRandomPrize;
-                updates['admin/finalizationTimestamp'] = Date.now();
+                updates['admin/finalizationTimestamp'] = serverNow();
                 
                 await database.ref().update(updates);
                 
@@ -1173,6 +1275,8 @@
         window.finaliseScores = finaliseScores;
         window.exportData = exportData;
         window.updateInitialBudget = updateInitialBudget;
+        window.clearTable = clearTable;
+        window.startNewSession = startNewSession;
     </script>
 </body>
 </html>

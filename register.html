@@ -203,6 +203,13 @@
                 return;
             }
             
+            // FIX: . # $ [ ] / are illegal in Firebase keys, so these names used to fail
+            // with a generic "Error registering team" and no way for students to guess why.
+            if (/[.#$\[\]\/]/.test(teamName)) {
+                showError('Team name cannot contain . # $ [ ] or /');
+                return;
+            }
+            
             // Show loading state
             setLoading(true);
             
